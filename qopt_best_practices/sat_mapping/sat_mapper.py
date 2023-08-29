@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-from typing import Tuple
-import logging
+import networkx as nx
+import numpy as np
+
 from dataclasses import dataclass
 from itertools import combinations
 from threading import Timer
 
-import networkx as nx
-import numpy as np
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
 
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
-logger = logging.getLogger(__name__)
 
 @dataclass
 class SATResult:
@@ -26,11 +24,8 @@ class SATResult:
 
 
 class SATMapper:
-    r"""A class to introduce a SAT-approach to solve the subgraph isomorphism problem as well as
+    r"""A class to introduce a SAT-approach to solve
     the initial mapping problem in SWAP gate insertion for commuting gates.
-
-
-    find a mapping for commuting gates using a SAT solver.
 
     When this pass is run on a DAG it will look for the first instance of
     :class:`.Commuting2qBlock` and use the program graph :math:`P` of this block of gates to
@@ -58,8 +53,8 @@ class SATMapper:
         self,
         program_graph: nx.Graph,
         swap_strategy: SwapStrategy,
-        start: int | None = None,
-        last: int | None = None,
+        min_layers: int | None = None,
+        max_layers: int | None = None,
     ) -> dict[int, SATResult]:
         r"""Find an initial mapping for a given swap strategy. Perform a binary search over the number
         of swap layers, and for each number of swap layers solve a subgraph isomorphism problem
@@ -68,9 +63,9 @@ class SATMapper:
         Args:
             program_graph (nx.Graph): The program graph with commuting gates, where each edge represents a two-qubit gate.
             swap_strategy (SwapStrategy): The swap strategy to use to find the initial mapping.
-            start (int): The minimum number of swap layers to consider. Defaults to the maximum degree of the
+            min_layers (int): The minimum number of swap layers to consider. Defaults to the maximum degree of the
             program graph - 2.
-            last (int): The maximum number of swap layers to consider. Defaults to the number of qubits
+            max_layers (int): The maximum number of swap layers to consider. Defaults to the number of qubits
             in the swap strategy - 2.
 
         Returns:
@@ -81,13 +76,13 @@ class SATMapper:
         num_nodes_G2 = swap_strategy.distance_matrix.shape[0]
         if num_nodes_G1 > num_nodes_G2:
             return SATResult(False, [], [], 0)
-        if start is None:
+        if min_layers is None:
             # use the maximum degree of the program graph - 2 as the lower bound.
-            start = max([d for _, d in program_graph.degree]) - 2
-        if last is None:
-            last = num_nodes_G2 - 2
+            min_layers = max([d for _, d in program_graph.degree]) - 2
+        if max_layers is None:
+            max_layers = num_nodes_G2 - 2
 
-        variable_pool = IDPool(start_from=1)
+        variable_pool = IDPool(min_layers_from=1)
         x = np.array(
             [
                 [variable_pool.id(f"v_{i}_{j}") for j in range(num_nodes_G2)]
@@ -116,8 +111,8 @@ class SATMapper:
 
         # Perform a binary search over the number of swap layers to find the minimum number of swap layers
         # that satisfies the subgraph isomorphism problem.
-        while start < last:
-            num_layers = (start + last) // 2
+        while min_layers < max_layers:
+            num_layers = (min_layers + max_layers) // 2
             distance_matrix = swap_strategy.distance_matrix
             connectivity_matrix = (distance_matrix <= num_layers).astype(int)
             # Make a cnf for the adjacency constraint
@@ -150,16 +145,16 @@ class SATMapper:
                     binary_search_results[num_layers] = SATResult(
                         status, sol, mapping, e_time
                     )
-                    last = num_layers
+                    max_layers = num_layers
                 else:
                     # If the SAT problem is unsatisfiable, return the last satisfiable solution.
                     binary_search_results[num_layers] = SATResult(
                         status, sol, [], e_time
                     )
-                    start = num_layers + 1
+                    min_layers = num_layers + 1
         return binary_search_results
 
-    def remap_graph_with_sat(self, graph: nx.Graph, swap_strategy) -> Tuple[int, dict, list]:
+    def remap_graph_with_sat(self, graph: nx.Graph, swap_strategy) -> tuple[int, dict, list]:
         """Applies the SAT mapping.
 
         Note the returned edge map `{k: v}` means that node `k` in the original

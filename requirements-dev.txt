@@ -1,0 +1,2 @@
+black[jupyter]~=22.0
+pylint>=2.15.0

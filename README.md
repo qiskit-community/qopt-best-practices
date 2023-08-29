@@ -7,6 +7,6 @@ A collection of guidelines to run quantum optimization algorithms on superconduc
 - The current structure is not all definitive, 
 expect directories will be added/renamed/moved around.
 
-- The current code is tested in `tmp.pynb` 
+- The current code is tested in `tmp.ipynb` 
 (top level directory) as a temporary measure until the layout
 of the repository is decided. Proper unit tests will follow. 

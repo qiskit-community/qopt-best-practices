@@ -1,7 +1,9 @@
-from typing import List, Tuple, Optional
+"""Graph utils"""
+
 import networkx as nx
 
-def build_graph(paulis: List[Tuple[str, float]]) -> nx.Graph:
+
+def build_graph(paulis: list[tuple[str, float]]) -> nx.Graph:
     """Create a graph by parsing the pauli strings.
 
     Args:

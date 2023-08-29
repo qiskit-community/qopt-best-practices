@@ -1,10 +1,10 @@
-from __future__ import annotations
+"""Subset finders. Currently contains reference implementation
+to evaluate 2-qubit gate fidelity."""
 
-from qiskit.transpiler import CouplingMap
+from __future__ import annotations
 
 # TODO: backend & edges typehint. Currently, only BackendV1 is supported
 #       Might make sense to extend to BackendV2 for generality
-
 def evaluate_fidelity(path: list[int], backend, edges) -> float:
     """Evaluates fidelity on a given list of qubits based on the two-qubit gate error
     for a specific backend.
@@ -26,7 +26,8 @@ def evaluate_fidelity(path: list[int], backend, edges) -> float:
     for edge in edges:
         try:
             cx_error = props.gate_error(gate_name, edge)
-        except:
+
+        except:  # pylint: disable=bare-except
             cx_error = props.gate_error(gate_name, edge[::-1])
 
         two_qubit_fidelity[tuple(edge)] = 1 - cx_error

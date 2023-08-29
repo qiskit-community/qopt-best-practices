@@ -1,11 +1,14 @@
+"""A class to solve the SWAP gate insertion initial mapping problem
+using the SAT approach.
+"""
 from __future__ import annotations
-
-import networkx as nx
-import numpy as np
 
 from dataclasses import dataclass
 from itertools import combinations
 from threading import Timer
+
+import networkx as nx
+import numpy as np
 
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
@@ -56,41 +59,43 @@ class SATMapper:
         min_layers: int | None = None,
         max_layers: int | None = None,
     ) -> dict[int, SATResult]:
-        r"""Find an initial mapping for a given swap strategy. Perform a binary search over the number
-        of swap layers, and for each number of swap layers solve a subgraph isomorphism problem
-        formulated as a SAT problem.
+        r"""Find an initial mapping for a given swap strategy. Perform a binary search
+        over the number of swap layers, and for each number of swap layers solve a
+        subgraph isomorphism problem formulated as a SAT problem.
 
         Args:
-            program_graph (nx.Graph): The program graph with commuting gates, where each edge represents a two-qubit gate.
+            program_graph (nx.Graph): The program graph with commuting gates, where
+                                        each edge represents a two-qubit gate.
             swap_strategy (SwapStrategy): The swap strategy to use to find the initial mapping.
-            min_layers (int): The minimum number of swap layers to consider. Defaults to the maximum degree of the
-            program graph - 2.
-            max_layers (int): The maximum number of swap layers to consider. Defaults to the number of qubits
-            in the swap strategy - 2.
+            min_layers (int): The minimum number of swap layers to consider. Defaults to
+            the maximum degree of the program graph - 2.
+            max_layers (int): The maximum number of swap layers to consider. Defaults to
+            the number of qubits in the swap strategy - 2.
 
         Returns:
-            dict[int, SATResult]: A dictionary containing the results of the SAT solver for each number of swap layers.
+            dict[int, SATResult]: A dictionary containing the results of the SAT solver for
+                                    each number of swap layers.
         """
         # pylint: disable=too-many-locals
-        num_nodes_G1 = len(program_graph.nodes)
-        num_nodes_G2 = swap_strategy.distance_matrix.shape[0]
-        if num_nodes_G1 > num_nodes_G2:
+        num_nodes_g1 = len(program_graph.nodes)
+        num_nodes_g2 = swap_strategy.distance_matrix.shape[0]
+        if num_nodes_g1 > num_nodes_g2:
             return SATResult(False, [], [], 0)
         if min_layers is None:
             # use the maximum degree of the program graph - 2 as the lower bound.
-            min_layers = max([d for _, d in program_graph.degree]) - 2
+            min_layers = max((d for _, d in program_graph.degree)) - 2
         if max_layers is None:
-            max_layers = num_nodes_G2 - 2
+            max_layers = num_nodes_g2 - 2
 
-        variable_pool = IDPool(min_layers_from=1)
-        x = np.array(
+        variable_pool = IDPool(start_from=1)
+        variables = np.array(
             [
-                [variable_pool.id(f"v_{i}_{j}") for j in range(num_nodes_G2)]
-                for i in range(num_nodes_G1)
+                [variable_pool.id(f"v_{i}_{j}") for j in range(num_nodes_g2)]
+                for i in range(num_nodes_g1)
             ],
             dtype=int,
         )
-        vid2mapping = {v: idx for idx, v in np.ndenumerate(x)}
+        vid2mapping = {v: idx for idx, v in np.ndenumerate(variables)}
         binary_search_results = {}
 
         def interrupt(solver):
@@ -99,29 +104,33 @@ class SATMapper:
 
         # Make a cnf for the one-to-one mapping constraint
         cnf1 = []
-        for i in range(num_nodes_G1):
-            clause = x[i, :].tolist()
+        for i in range(num_nodes_g1):
+            clause = variables[i, :].tolist()
             cnf1.append(clause)
             for k, m in combinations(clause, 2):
                 cnf1.append([-1 * k, -1 * m])
-        for j in range(num_nodes_G2):
-            clause = x[:, j].tolist()
+        for j in range(num_nodes_g2):
+            clause = variables[:, j].tolist()
             for k, m in combinations(clause, 2):
                 cnf1.append([-1 * k, -1 * m])
 
-        # Perform a binary search over the number of swap layers to find the minimum number of swap layers
-        # that satisfies the subgraph isomorphism problem.
+        # Perform a binary search over the number of swap layers to find the minimum
+        # number of swap layers that satisfies the subgraph isomorphism problem.
         while min_layers < max_layers:
             num_layers = (min_layers + max_layers) // 2
             distance_matrix = swap_strategy.distance_matrix
             connectivity_matrix = (distance_matrix <= num_layers).astype(int)
             # Make a cnf for the adjacency constraint
             cnf2 = []
-            # adj_matrix_G2 = nx.to_numpy_array(G2, dtype=int)
-            for e0, e1 in program_graph.edges:
-                clause_matrix = np.multiply(connectivity_matrix, x[e1, :])
+            # adj_matrix_g2 = nx.to_numpy_array(g2, dtype=int)
+            for e_0, e_1 in program_graph.edges:
+                clause_matrix = np.multiply(connectivity_matrix, variables[e_1, :])
                 clause = np.concatenate(
-                    ([[-x[e0, i]] for i in range(num_nodes_G2)], clause_matrix), axis=1
+                    (
+                        [[-variables[e_0, i]] for i in range(num_nodes_g2)],
+                        clause_matrix,
+                    ),
+                    axis=1,
                 )
                 # Remove 0s from each clause
                 cnf2.extend([c[c != 0].tolist() for c in clause])
@@ -154,22 +163,24 @@ class SATMapper:
                     min_layers = num_layers + 1
         return binary_search_results
 
-    def remap_graph_with_sat(self, graph: nx.Graph, swap_strategy) -> tuple[int, dict, list]:
+    def remap_graph_with_sat(
+        self, graph: nx.Graph, swap_strategy
+    ) -> tuple[int, dict, list]:
         """Applies the SAT mapping.
 
         Note the returned edge map `{k: v}` means that node `k` in the original
         graph gets mapped to node `v` in the Pauli strings.
         """
-        n = len(graph.nodes)
-        results = self.find_initial_mappings(graph, swap_strategy, 0, n - 2)
+        num_nodes = len(graph.nodes)
+        results = self.find_initial_mappings(graph, swap_strategy, 0, num_nodes - 2)
 
-        min_k = min([k for k in results.keys() if results[k].satisfiable])
-        edge_map = {k: v for k, v in results[min_k].mapping}
+        min_k = min((k for k, v in results.items() if v.satisfiable))
+        edge_map = dict(results[min_k].mapping)
 
         paulis = []
 
         for edge in graph.edges():
-            zop = ["I"] * n
+            zop = ["I"] * num_nodes
             remapped_edge = (edge_map[edge[0]], edge_map[edge[1]])
             zop[remapped_edge[0]] = "Z"
             zop[remapped_edge[1]] = "Z"

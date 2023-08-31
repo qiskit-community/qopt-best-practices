@@ -11,7 +11,7 @@ A collection of guidelines to run quantum optimization algorithms on superconduc
 
 ## Table of Contents
 
-The contents of the `q_optimization_best_practices` package are structured around the key strategies that 
+The contents of the `q_opt_best_practices` package are structured around the key strategies that 
 can be applied to best run quantum optimization algorithms on real hardware:
 
 1. Qubit Selection -> `qubit_selection`

@@ -19,3 +19,5 @@ can be applied to best run quantum optimization algorithms on real hardware:
 3. Application of SWAP strategies -> `swap_strategies`
 
 
+## References
+1. Sack, S. H., & Egger, D. J. (2023). Large-scale quantum approximate optimization on non-planar graphs with machine learning noise mitigation. arXiv preprint arXiv:2307.14427. [Link](https://arxiv.org/pdf/2307.14427.pdf).

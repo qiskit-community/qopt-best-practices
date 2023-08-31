@@ -1,11 +1,6 @@
 """Circuit utils"""
 
-from qiskit import transpile
 from qiskit.circuit import QuantumCircuit, ClassicalRegister
-
-from qiskit import quantum_info as qi
-from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.circuit import Parameter
 
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
@@ -14,6 +9,7 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
     Commuting2qGateRouter,
 )
 
+from qiskit.circuit.library import QAOAAnsatz
 
 def make_meas_map(circuit: QuantumCircuit) -> dict:
     """Return a mapping from qubit index (the key) to classical bit (the value).
@@ -30,13 +26,49 @@ def make_meas_map(circuit: QuantumCircuit) -> dict:
 
     return meas_map
 
+def apply_swap_strategy(circuit, swap_strategy):
 
-def create_qaoa_circ_pauli_evolution(
-    num_qubits: int,
-    local_correlators: list[tuple[str, float]],
+    edge_coloring = {(idx, idx + 1): idx % 2 for idx in range(circuit.num_qubits)}
+    pm_pre = PassManager(
+        [
+            FindCommutingPauliEvolutions(),
+            Commuting2qGateRouter(
+                swap_strategy,
+                edge_coloring,
+            )
+        ]
+    )
+    return pm_pre.run(circuit)
+
+def apply_qaoa_layers(circuit, meas_map, num_layers, gamma, beta):
+
+    num_qubits = circuit.num_qubits
+    new_circuit = QuantumCircuit(num_qubits)
+
+    for layer in range(num_layers):
+        bind_dict = {circuit.parameters[0]: gamma[layer]}
+        bound_hc = circuit.assign_parameters(bind_dict)
+        if layer % 2 == 0:
+           new_circuit.append(bound_hc, range(num_qubits))
+        else:
+            new_circuit.append(bound_hc.reverse_ops(), range(num_qubits))
+
+        new_circuit.rx(-2 * beta[layer], range(num_qubits))
+
+    creg = ClassicalRegister(num_qubits)
+    new_circuit.add_register(creg)
+
+    for qidx, cidx in meas_map.items():
+        new_circuit.measure(qidx, cidx)
+
+    return new_circuit
+
+def create_qaoa_swap_circuit(
+    cost_operator: list[tuple[str, float]],
     theta: list[float],
     swap_strategy: SwapStrategy,
-    random_cut: list[float] = None,
+    mixer_operator: QuantumCircuit = None,
+    initial_state: QuantumCircuit = None,
 ):
     """
     Args:
@@ -48,72 +80,43 @@ def create_qaoa_circ_pauli_evolution(
             as the number of qubits. If qubit `i` has a `1` then we flip its
             initial state from `+` to `-`.
     """
+
+    num_qubits = cost_operator.num_qubits
+
     gamma = theta[: len(theta) // 2]
     beta = theta[len(theta) // 2 :]
     qaoa_layers = len(theta) // 2
 
-    # First, create the Hamiltonian of 1 layer of QAOA
-    hc_evo = QuantumCircuit(num_qubits)
-    pauli_op = qi.SparsePauliOp.from_list(local_correlators)
-    gamma_param = Parameter("g")
-    hc_evo.append(PauliEvolutionGate(pauli_op, -gamma_param), range(num_qubits))
+    # First, create the ansatz of 1 layer of QAOA without mixer
+
+    if initial_state is None:
+        initial_state = QuantumCircuit(num_qubits)
+
+    if mixer_operator is None:
+        mixer_operator = QuantumCircuit(num_qubits)
+
+    qaoa_ansatz = QAOAAnsatz(cost_operator,
+                             reps=1,
+                             initial_state=initial_state,
+                             mixer_operator=mixer_operator).decompose()
 
     # This will allow us to recover the permutation of the measurements that the swap introduce.
-    hc_evo.measure_all()
+    qaoa_ansatz.measure_all()
 
-    edge_coloring = {(idx, idx + 1): idx % 2 for idx in range(num_qubits)}
-
-    pm_pre = PassManager(
-        [
-            FindCommutingPauliEvolutions(),
-            Commuting2qGateRouter(
-                swap_strategy,
-                edge_coloring,
-            ),
-        ]
-    )
-
-    # apply swaps
-    hc_evo = pm_pre.run(hc_evo)
-
-    basis_gates = ["rz", "sx", "x", "cx"]
-
-    # Now transpile to sx, rz, x, cx basis
-    hc_evo = transpile(hc_evo, basis_gates=basis_gates)
-
-    # Replace Rz with zero rotations in cost Hamiltonian if desired
-    # Deleted for now
+    # Now, apply the swap strategy for commuting pauli evolution gates
+    qaoa_ansatz = apply_swap_strategy(qaoa_ansatz, swap_strategy)
 
     # Compute the measurement map (qubit to classical bit).
     # we will apply this for qaoa_layers % 2 == 1.
+
     if qaoa_layers % 2 == 1:
-        meas_map = make_meas_map(hc_evo)
+        meas_map = make_meas_map(qaoa_ansatz)
     else:
         meas_map = {idx: idx for idx in range(num_qubits)}
 
-    hc_evo.remove_final_measurements()
+    qaoa_ansatz.remove_final_measurements()
 
-    circuit = QuantumCircuit(num_qubits)
-
-    if random_cut is not None:
-        for idx, coin_flip in enumerate(random_cut):
-            if coin_flip == 1:
-                circuit.x(idx)
-
-    for layer in range(qaoa_layers):
-        bind_dict = {gamma_param: gamma[layer]}
-        bound_hc = hc_evo.assign_parameters(bind_dict)
-        if layer % 2 == 0:
-            circuit.append(bound_hc, range(num_qubits))
-        else:
-            circuit.append(bound_hc.reverse_ops(), range(num_qubits))
-
-        circuit.rx(-2 * beta[layer], range(num_qubits))
-
-    creg = ClassicalRegister(num_qubits)
-    circuit.add_register(creg)
-
-    for qidx, cidx in meas_map.items():
-        circuit.measure(qidx, cidx)
+    # Finally, introduce the mixer circuit and add measurements following measurement map
+    circuit = apply_qaoa_layers(qaoa_ansatz, meas_map, qaoa_layers, gamma, beta)
 
     return circuit

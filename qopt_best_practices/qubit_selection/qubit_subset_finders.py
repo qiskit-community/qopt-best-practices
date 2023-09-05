@@ -2,6 +2,8 @@
 to find lines."""
 
 from __future__ import annotations
+import itertools
+
 import rustworkx as rx
 
 from qiskit.transpiler import CouplingMap

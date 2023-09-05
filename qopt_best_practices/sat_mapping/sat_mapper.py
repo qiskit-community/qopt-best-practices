@@ -191,4 +191,3 @@ class SATMapper:
 
         remapped_graph = nx.relabel_nodes(graph, edge_map)
         return remapped_graph, edge_map, min_k
-

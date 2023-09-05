@@ -1,5 +1,29 @@
 # q-optimization-best-practices
-A collection of guidelines to run quantum optimization algorithms on superconducting qubits using Qiskit.
+
+A collection of guidelines to run quantum optimization algorithms on superconducting qubits with Qiskit,
+using as reference the Quantum Approximate Optimization Algorithm (QAOA) workflow.
+
+This repository shows how to combine methods employed in the QAOA literature to get good results on hardware 
+(https://arxiv.org/abs/2307.14427), such as SWAP strategies (https://arxiv.org/abs/2202.03459), 
+SAT mapping (https://arxiv.org/abs/2212.05666), 
+pulse-efficient transpilation and dynamical-decoupling [coming soon!]. In the future, it will be expanded 
+to include a broader range of quantum algorithms for combinatorial optimization.
+
+The `qopt_best_practices` directory contains a series of reference implementations for the key 
+strategies mentioned in the description. These are not intended to be feature-complete, they are
+prototypes that should be easy to test and try out in different settings 
+(that's why the library is pip-installable!) and can also serve as a guide for your 
+own advanced implementations of these techniques. 
+
+The `how-tos` directory contains a series of notebooks you can run to see these techniques in action.
+In many cases, the helper methods provided for a specific task (for example, swap mapping), are just 
+light wrappers over already-available Qiskit utilities (transpiler passes). How-tos that focus 
+on a specific tasks will probably show direct use of the Qiskit code, while how-tos that lay out a full
+workflow will likely rely on the provided wrappers for a more general overview of the steps to follow.
+
+
+If you see any bug or feature you'd like to add, this is a community effort, contributions are welcome!!
+Don't hesitate to open an issue or a PR. 
 
 ## Quick Start
 
@@ -17,6 +41,7 @@ can be applied to best run quantum optimization algorithms on real hardware:
 1. Qubit Selection -> `qubit_selection`
 2. SAT Mapping -> `sat_mapping`
 3. Application of SWAP strategies -> `swap_strategies`
+4. QAOA cost function -> `cost_function`
 
 
 ## References

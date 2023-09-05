@@ -12,6 +12,7 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
 from qiskit.circuit.library import QAOAAnsatz
 from qiskit.circuit import ParameterVector
 
+
 def make_meas_map(circuit: QuantumCircuit) -> dict:
     """Return a mapping from qubit index (the key) to classical bit (the value).
 
@@ -27,6 +28,7 @@ def make_meas_map(circuit: QuantumCircuit) -> dict:
 
     return meas_map
 
+
 def apply_swap_strategy(circuit, swap_strategy, edge_coloring):
 
     pm_pre = PassManager(
@@ -35,12 +37,15 @@ def apply_swap_strategy(circuit, swap_strategy, edge_coloring):
             Commuting2qGateRouter(
                 swap_strategy,
                 edge_coloring,
-            )
+            ),
         ]
     )
     return pm_pre.run(circuit)
 
-def apply_qaoa_layers(cost, meas_map, num_layers, gamma=None, beta=None, initial_state=None, mixer=None):
+
+def apply_qaoa_layers(
+    cost, meas_map, num_layers, gamma=None, beta=None, initial_state=None, mixer=None
+):
 
     num_qubits = cost.num_qubits
     new_circuit = QuantumCircuit(num_qubits, num_qubits)
@@ -67,11 +72,14 @@ def apply_qaoa_layers(cost, meas_map, num_layers, gamma=None, beta=None, initial
     for layer in range(num_layers):
         bind_dict = {cost.parameters[0]: gamma[layer]}
         layer_cost = cost.assign_parameters(bind_dict)
-        bind_dict = {mixer_layer.parameters[i]: beta[layer + i] for i in range(mixer_layer.num_parameters)}
+        bind_dict = {
+            mixer_layer.parameters[i]: beta[layer + i]
+            for i in range(mixer_layer.num_parameters)
+        }
         layer_mixer = mixer_layer.assign_parameters(bind_dict)
 
         if layer % 2 == 0:
-           new_circuit.append(layer_cost, range(num_qubits))
+            new_circuit.append(layer_cost, range(num_qubits))
         else:
             new_circuit.append(layer_cost.reverse_ops(), range(num_qubits))
 
@@ -81,6 +89,7 @@ def apply_qaoa_layers(cost, meas_map, num_layers, gamma=None, beta=None, initial
         new_circuit.measure(qidx, cidx)
 
     return new_circuit
+
 
 def create_qaoa_swap_circuit(
     cost_operator: list[tuple[str, float]],
@@ -106,17 +115,19 @@ def create_qaoa_swap_circuit(
 
     if theta is not None:
         gamma = theta[: len(theta) // 2]
-        beta = theta[len(theta) // 2:]
+        beta = theta[len(theta) // 2 :]
         qaoa_layers = len(theta) // 2
     else:
         gamma = beta = None
         qaoa_layers = qaoa_layers
 
     # First, create the ansatz of 1 layer of QAOA without mixer
-    cost_layer = QAOAAnsatz(cost_operator,
-                             reps=1,
-                             initial_state=QuantumCircuit(num_qubits),
-                             mixer_operator=QuantumCircuit(num_qubits)).decompose()
+    cost_layer = QAOAAnsatz(
+        cost_operator,
+        reps=1,
+        initial_state=QuantumCircuit(num_qubits),
+        mixer_operator=QuantumCircuit(num_qubits),
+    ).decompose()
 
     # This will allow us to recover the permutation of the measurements that the swap introduce.
     cost_layer.measure_all()
@@ -135,7 +146,8 @@ def create_qaoa_swap_circuit(
     cost_layer.remove_final_measurements()
 
     # Finally, introduce the mixer circuit and add measurements following measurement map
-    circuit = apply_qaoa_layers(cost_layer, meas_map, qaoa_layers, gamma, beta, initial_state, mixer)
-
+    circuit = apply_qaoa_layers(
+        cost_layer, meas_map, qaoa_layers, gamma, beta, initial_state, mixer
+    )
 
     return circuit

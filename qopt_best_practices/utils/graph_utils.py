@@ -20,6 +20,7 @@ def build_graph(paulis: list[tuple[str, float]]) -> nx.Graph:
 
     return nx.from_edgelist(edges)
 
+
 def build_paulis(graph: nx.Graph) -> list[tuple[str, float]]:
     """Convert the graph to Pauli list.
 

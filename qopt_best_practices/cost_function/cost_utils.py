@@ -7,6 +7,7 @@ _PARITY = np.array(
     [-1 if bin(i).count("1") % 2 else 1 for i in range(256)], dtype=np.complex128
 )
 
+
 def evaluate_sparse_pauli(state: int, observable: SparsePauliOp) -> complex:
     """Utility for the evaluation of the expectation value of a measured state."""
     packed_uint8 = np.packbits(observable.paulis.z, axis=1, bitorder="little")
@@ -15,6 +16,7 @@ def evaluate_sparse_pauli(state: int, observable: SparsePauliOp) -> complex:
     )
     reduced = np.bitwise_xor.reduce(packed_uint8 & state_bytes, axis=1)
     return np.sum(observable.coeffs * _PARITY[reduced])
+
 
 def qaoa_sampler_cost_fun(params, ansatz, hamiltonian, sampler):
 

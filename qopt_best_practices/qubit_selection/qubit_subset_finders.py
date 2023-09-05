@@ -2,6 +2,7 @@
 to find lines."""
 
 from __future__ import annotations
+import itertools
 import rustworkx as rx
 
 from qiskit.transpiler import CouplingMap
@@ -24,6 +25,7 @@ def find_lines(
     # might make sense to make backend the only input for simplicity
     if coupling_map is None:
         coupling_map = CouplingMap(backend.configuration().coupling_map)
+
     paths, size = [], coupling_map.size()
 
     # picking the lines

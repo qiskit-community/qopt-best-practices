@@ -50,7 +50,8 @@ class BackendEvaluator:
             for subset in qubit_subsets
         ]
 
-        # Return the best subset sorted by score (minimize score)
-        return min(zip(qubit_subsets, scores), key=lambda x: -x[1])[0], len(
-            qubit_subsets
-        )
+        # Return the best subset sorted by score
+        best_subset, best_score = min(zip(qubit_subsets, scores), key=lambda x: -x[1])
+        num_subsets = len(qubit_subsets)
+
+        return best_subset, best_score, num_subsets

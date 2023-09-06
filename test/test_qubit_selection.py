@@ -7,13 +7,16 @@ from qiskit.providers.fake_provider import FakeWashington
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
 from qopt_best_practices.utils import build_graph, build_paulis
-from qopt_best_practices.utils import create_qaoa_circ_pauli_evolution
+from qopt_best_practices.swap_strategies import *
 
-from qopt_best_practices.sat_mapping import SATMapper
-from qopt_best_practices.qubit_selection import BackendEvaluator
+from qopt_best_practices.qubit_selection import (
+    BackendEvaluator,
+    find_lines,
+    evaluate_fidelity,
+)
 
 
-class TestFullWorkflowLine(TestCase):
+class TestQubitSelection(TestCase):
 
     """Unit test for QAOA workflow."""
 
@@ -42,36 +45,22 @@ class TestFullWorkflowLine(TestCase):
             [i for i in range(len(self.original_graph.nodes))]
         )
 
-    def test_sat_mapping(self):
-        """Test SAT mapping"""
+    def test_find_lines(self):
+        """Test backend evaluation"""
 
-        sat_mapper = SATMapper()
-        min_k, edge_map, paulis = sat_mapper.remap_graph_with_sat(
-            graph=self.original_graph, swap_strategy=self.swap_strategy
-        )
+        paths = find_lines(len(self.mapped_graph), self.backend)
 
-        self.assertEqual(min_k, self.min_swap_layers)
-        self.assertDictEqual(edge_map, self.sat_mapping)
-        self.assertEqual(set(paulis), set(self.mapped_paulis))
+        self.assertEqual(len(paths), 1237)
+        self.assertEqual(len(paths[0]), len(self.mapped_graph))
+        self.assertIsInstance(paths[0][0], int)
 
     def test_qubit_selection(self):
         """Test backend evaluation"""
 
         path_finder = BackendEvaluator(self.backend)
 
-        path, _ = path_finder.evaluate(len(self.mapped_graph))
+        path, fidelity, num_subsets = path_finder.evaluate(len(self.mapped_graph))
 
-        # this is just a placeholder, get proper data to test
         expected_path = [30, 31, 32, 36, 51, 50, 49, 48, 47, 35]
 
         self.assertEqual(set(path), set(expected_path))
-
-    def test_circuit_construction(self):
-        """Test circuit construction"""
-
-        theta = [1, 1, 0, 1]
-        qaoa_circ = create_qaoa_circ_pauli_evolution(
-            len(self.mapped_graph), self.mapped_paulis, theta, self.swap_strategy
-        )
-
-        print(qaoa_circ)

@@ -3,6 +3,7 @@ to find lines."""
 
 from __future__ import annotations
 import itertools
+
 import rustworkx as rx
 
 from qiskit.transpiler import CouplingMap
@@ -12,7 +13,7 @@ from qiskit.transpiler import CouplingMap
 def find_lines(
     length: int, backend, coupling_map: CouplingMap | None = None
 ) -> list[int]:
-    """Finds all possible lines of lengt `length` for a specific backend topology.
+    """Finds all possible lines of length `length` for a specific backend topology.
 
     This method can take quite some time to run on large devices since there
     are many paths.
@@ -25,20 +26,15 @@ def find_lines(
     # might make sense to make backend the only input for simplicity
     if coupling_map is None:
         coupling_map = CouplingMap(backend.configuration().coupling_map)
-
-    paths, size = [], coupling_map.size()
+    size = coupling_map.size()
 
     # picking the lines
-    for node1 in range(size):
-        for node2 in range(node1 + 1, size):
-            paths.extend(
-                rx.all_simple_paths(
-                    coupling_map.graph,
-                    node1,
-                    node2,
-                    min_depth=length,
-                    cutoff=length,
-                )
-            )
+    paths = list(itertools.chain.from_iterable(
+        rx.all_pairs_all_simple_paths(
+            coupling_map.graph,
+            min_depth=length,
+            cutoff=length,
+        ).values()
+    ))
 
     return paths

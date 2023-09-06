@@ -178,16 +178,5 @@ class SATMapper:
         min_k = min((k for k, v in results.items() if v.satisfiable))
         edge_map = dict(results[min_k].mapping)
 
-        # paulis = []
-        #
-        # for edge in graph.edges():
-        #     zop = ["I"] * num_nodes
-        #     remapped_edge = (edge_map[edge[0]], edge_map[edge[1]])
-        #     zop[remapped_edge[0]] = "Z"
-        #     zop[remapped_edge[1]] = "Z"
-        #     paulis.append(("".join(zop), 1.0))
-        #
-        # return min_k, edge_map, paulis
-
         remapped_graph = nx.relabel_nodes(graph, edge_map)
         return remapped_graph, edge_map, min_k

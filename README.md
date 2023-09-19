@@ -6,7 +6,7 @@ using as reference the Quantum Approximate Optimization Algorithm (QAOA) workflo
 This repository shows how to combine methods employed in the QAOA literature to get good results on hardware [[1]](https://arxiv.org/abs/2307.14427), 
 such as SWAP strategies [[2]](https://arxiv.org/abs/2202.03459), 
 SAT mapping [[3]](https://arxiv.org/abs/2212.05666), 
-pulse-efficient transpilation and dynamical-decoupling [coming soon!]. In the future, it will be expanded 
+pulse-efficient transpilation and dynamical-decoupling [coming soon]. In the future, it will be expanded 
 to include a broader range of quantum algorithms for combinatorial optimization.
 
 The `qopt_best_practices` directory contains a series of reference implementations for the key 
@@ -22,7 +22,7 @@ on a specific tasks will probably show direct use of the Qiskit code, while how-
 workflow will likely rely on the provided wrappers for a more general overview of the steps to follow.
 
 
-If you see any bug or feature you'd like to add, this is a community effort, contributions are welcome!!
+If you see any bug or feature you'd like to add, this is a community effort, contributions are welcome.
 Don't hesitate to open an issue or a PR. 
 
 ## Quick Start

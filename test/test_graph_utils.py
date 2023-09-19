@@ -1,7 +1,7 @@
 from unittest import TestCase
 import networkx as nx
 
-from qopt_best_practices.utils import build_graph, build_paulis
+from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
 
 
 class TestGraphRoundTrip(TestCase):
@@ -25,6 +25,6 @@ class TestGraphRoundTrip(TestCase):
 
         for seed in range(5):
             graph1 = nx.random_regular_graph(3, 10, seed=seed)
-            graph2 = build_graph(build_paulis(graph1))
+            graph2 = build_max_cut_graph(build_max_cut_paulis(graph1))
 
             self.assertTrue(self._test_edge_equality(graph1, graph2))

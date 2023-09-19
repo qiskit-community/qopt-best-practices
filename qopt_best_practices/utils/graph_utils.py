@@ -3,7 +3,7 @@
 import networkx as nx
 
 
-def build_graph(paulis: list[tuple[str, float]]) -> nx.Graph:
+def build_max_cut_graph(paulis: list[tuple[str, float]]) -> nx.Graph:
     """Create a graph by parsing the pauli strings.
 
     Args:
@@ -21,7 +21,7 @@ def build_graph(paulis: list[tuple[str, float]]) -> nx.Graph:
     return nx.from_edgelist(edges)
 
 
-def build_paulis(graph: nx.Graph) -> list[tuple[str, float]]:
+def build_max_cut_paulis(graph: nx.Graph) -> list[tuple[str, float]]:
     """Convert the graph to Pauli list.
 
     This function does the inverse of `build_graph`

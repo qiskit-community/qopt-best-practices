@@ -27,7 +27,7 @@ Don't hesitate to open an issue or a PR.
 
 ## Quick Start
 
-1. run `git clone https://github.com/ElePT/q-optimization-best-practices.git` in your local environment
+1. run `git clone https://github.com/qiskit-community/q-optimization-best-practices.git` in your local environment
 2. do `pip install -r requirements.txt`
 3. do `pip install .`
 4. navigate to the `how-tos` section and run the notebook of your choice!

@@ -1,5 +1,5 @@
 """A class to solve the SWAP gate insertion initial mapping problem
-using the SAT approach.
+using the SAT approach from https://arxiv.org/abs/2212.05666.
 """
 from __future__ import annotations
 

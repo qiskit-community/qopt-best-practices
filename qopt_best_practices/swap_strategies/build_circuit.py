@@ -29,7 +29,16 @@ def make_meas_map(circuit: QuantumCircuit) -> dict:
     return meas_map
 
 
-def apply_swap_strategy(circuit, swap_strategy, edge_coloring):
+def apply_swap_strategy(
+    circuit: QuantumCircuit,
+    swap_strategy: SwapStrategy,
+    edge_coloring: dict[tuple[int, int], int] | None = None,
+) -> QuantumCircuit:
+    """Transpile with a SWAP strategy.
+
+    Returns:
+        A quantum circuit transpiled with the given swap strategy.
+    """
 
     pm_pre = PassManager(
         [
@@ -100,18 +109,27 @@ def create_qaoa_swap_circuit(
     initial_state: QuantumCircuit = None,
     mixer: QuantumCircuit = None,
 ):
-    """
+    """Create the circuit for QAOA.
+
+    Notes: This circuit construction for QAOA works for quadratic terms in `Z` and will be
+    extended to first-order terms in `Z`.
+
     Args:
-        num_qubits: the number of qubits
-        local_correlators: list of paulis
-        theta: The QAOA angles.
+        cost_operator: the cost operator.
         swap_strategy: selected swap strategy
-        random_cut: A random cut, i.e., a series of 1 and 0 with the same length
-            as the number of qubits. If qubit `i` has a `1` then we flip its
-            initial state from `+` to `-`.
+        edge_coloring: A coloring of edges that should correspond to the coupling
+            map of the hardware. It defines the order in which we apply the Rzz
+            gates. This allows us to choose an ordering such that `Rzz` gates will
+            immediately precede SWAP gates to leverage CNOT cancellation.
+        theta: The QAOA angles.
+        qaoa_layers: The number of layers of the cost-operator and the mixer operator.
+        initial_state: The initial state on which we apply layers of cost-operator
+            and mixer.
+        mixer: The QAOA mixer. It will be applied as is onto the QAOA circuit. Therefore,
+            its output must have the same ordering of qubits as its input.
     """
 
-    num_qubits = cost_operator.num_qubits
+    num_qubits = cost_operator.num_qubits  # TODO This should not work
 
     if theta is not None:
         gamma = theta[: len(theta) // 2]

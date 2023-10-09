@@ -124,7 +124,6 @@ class SATMapper:
             connectivity_matrix = (distance_matrix <= num_layers).astype(int)
             # Make a cnf for the adjacency constraint
             cnf2 = []
-            # adj_matrix_g2 = nx.to_numpy_array(g2, dtype=int)
             for e_0, e_1 in program_graph.edges:
                 clause_matrix = np.multiply(connectivity_matrix, variables[e_1, :])
                 clause = np.concatenate(

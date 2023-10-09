@@ -1,6 +1,7 @@
 """Circuit utils"""
 
 from qiskit.circuit import QuantumCircuit, ClassicalRegister
+from qiskit.quantum_info import SparsePauliOp
 
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
@@ -101,7 +102,7 @@ def apply_qaoa_layers(
 
 
 def create_qaoa_swap_circuit(
-    cost_operator: list[tuple[str, float]],
+    cost_operator: SparsePauliOp,
     swap_strategy: SwapStrategy,
     edge_coloring: dict = None,
     theta: list[float] = None,
@@ -112,7 +113,7 @@ def create_qaoa_swap_circuit(
     """Create the circuit for QAOA.
 
     Notes: This circuit construction for QAOA works for quadratic terms in `Z` and will be
-    extended to first-order terms in `Z`.
+    extended to first-order terms in `Z`. Higher-orders are not supported.
 
     Args:
         cost_operator: the cost operator.
@@ -129,11 +130,11 @@ def create_qaoa_swap_circuit(
             its output must have the same ordering of qubits as its input.
     """
 
-    num_qubits = cost_operator.num_qubits  # TODO This should not work
+    num_qubits = cost_operator.num_qubits
 
     if theta is not None:
         gamma = theta[: len(theta) // 2]
-        beta = theta[len(theta) // 2 :]
+        beta = theta[len(theta) // 2:]
         qaoa_layers = len(theta) // 2
     else:
         gamma = beta = None

@@ -1,6 +1,7 @@
 """Circuit utils"""
 
 from qiskit.circuit import QuantumCircuit, ClassicalRegister
+from qiskit.quantum_info import SparsePauliOp
 
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
@@ -16,7 +17,7 @@ from qiskit.circuit import ParameterVector
 def make_meas_map(circuit: QuantumCircuit) -> dict:
     """Return a mapping from qubit index (the key) to classical bit (the value).
 
-    This allows us to account for the swapping order.
+    This allows us to account for the swapping order introduced by the SwapStrategy.
     """
     creg = circuit.cregs[0]
     qreg = circuit.qregs[0]
@@ -29,7 +30,16 @@ def make_meas_map(circuit: QuantumCircuit) -> dict:
     return meas_map
 
 
-def apply_swap_strategy(circuit, swap_strategy, edge_coloring):
+def apply_swap_strategy(
+    circuit: QuantumCircuit,
+    swap_strategy: SwapStrategy,
+    edge_coloring: dict[tuple[int, int], int] | None = None,
+) -> QuantumCircuit:
+    """Transpile with a SWAP strategy.
+
+    Returns:
+        A quantum circuit transpiled with the given swap strategy.
+    """
 
     pm_pre = PassManager(
         [
@@ -44,10 +54,24 @@ def apply_swap_strategy(circuit, swap_strategy, edge_coloring):
 
 
 def apply_qaoa_layers(
-    cost, meas_map, num_layers, gamma=None, beta=None, initial_state=None, mixer=None
+    cost_layer: QuantumCircuit,
+    meas_map: dict,
+    num_layers: int,
+    gamma: list[float] | ParameterVector = None,
+    beta: list[float] | ParameterVector = None,
+    initial_state: QuantumCircuit = None,
+    mixer: QuantumCircuit = None,
 ):
+    """Construct the QAOA circuit.
 
-    num_qubits = cost.num_qubits
+    First, the initial state is applied. If `initial_state` is None we begin in the
+    initial superposition state. Next, we alternate between layers of the cot operator
+    and the mixer. The cost operator is alternatively applied in order and in reverse
+    instruction order. This allows us to apply the swap-strategy on odd `p` layers
+    and undo the swap strategy on even `p` layers.
+    """
+
+    num_qubits = cost_layer.num_qubits
     new_circuit = QuantumCircuit(num_qubits, num_qubits)
 
     if initial_state is not None:
@@ -70,8 +94,8 @@ def apply_qaoa_layers(
         mixer_layer.rx(beta[0], range(num_qubits))
 
     for layer in range(num_layers):
-        bind_dict = {cost.parameters[0]: gamma[layer]}
-        layer_cost = cost.assign_parameters(bind_dict)
+        bind_dict = {cost_layer.parameters[0]: gamma[layer]}
+        cost_layer_ = cost_layer.assign_parameters(bind_dict)
         bind_dict = {
             mixer_layer.parameters[i]: beta[layer + i]
             for i in range(mixer_layer.num_parameters)
@@ -79,9 +103,9 @@ def apply_qaoa_layers(
         layer_mixer = mixer_layer.assign_parameters(bind_dict)
 
         if layer % 2 == 0:
-            new_circuit.append(layer_cost, range(num_qubits))
+            new_circuit.append(cost_layer_, range(num_qubits))
         else:
-            new_circuit.append(layer_cost.reverse_ops(), range(num_qubits))
+            new_circuit.append(cost_layer_.reverse_ops(), range(num_qubits))
 
         new_circuit.append(layer_mixer, range(num_qubits))
 
@@ -92,7 +116,7 @@ def apply_qaoa_layers(
 
 
 def create_qaoa_swap_circuit(
-    cost_operator: list[tuple[str, float]],
+    cost_operator: SparsePauliOp,
     swap_strategy: SwapStrategy,
     edge_coloring: dict = None,
     theta: list[float] = None,
@@ -100,22 +124,31 @@ def create_qaoa_swap_circuit(
     initial_state: QuantumCircuit = None,
     mixer: QuantumCircuit = None,
 ):
-    """
+    """Create the circuit for QAOA.
+
+    Notes: This circuit construction for QAOA works for quadratic terms in `Z` and will be
+    extended to first-order terms in `Z`. Higher-orders are not supported.
+
     Args:
-        num_qubits: the number of qubits
-        local_correlators: list of paulis
-        theta: The QAOA angles.
+        cost_operator: the cost operator.
         swap_strategy: selected swap strategy
-        random_cut: A random cut, i.e., a series of 1 and 0 with the same length
-            as the number of qubits. If qubit `i` has a `1` then we flip its
-            initial state from `+` to `-`.
+        edge_coloring: A coloring of edges that should correspond to the coupling
+            map of the hardware. It defines the order in which we apply the Rzz
+            gates. This allows us to choose an ordering such that `Rzz` gates will
+            immediately precede SWAP gates to leverage CNOT cancellation.
+        theta: The QAOA angles.
+        qaoa_layers: The number of layers of the cost-operator and the mixer operator.
+        initial_state: The initial state on which we apply layers of cost-operator
+            and mixer.
+        mixer: The QAOA mixer. It will be applied as is onto the QAOA circuit. Therefore,
+            its output must have the same ordering of qubits as its input.
     """
 
     num_qubits = cost_operator.num_qubits
 
     if theta is not None:
         gamma = theta[: len(theta) // 2]
-        beta = theta[len(theta) // 2 :]
+        beta = theta[len(theta) // 2:]
         qaoa_layers = len(theta) // 2
     else:
         gamma = beta = None
@@ -137,7 +170,6 @@ def create_qaoa_swap_circuit(
 
     # Compute the measurement map (qubit to classical bit).
     # we will apply this for qaoa_layers % 2 == 1.
-
     if qaoa_layers % 2 == 1:
         meas_map = make_meas_map(cost_layer)
     else:

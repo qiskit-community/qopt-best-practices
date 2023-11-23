@@ -144,18 +144,12 @@ def create_qaoa_swap_circuit(
             map of the hardware. It defines the order in which we apply the Rzz
             gates. This allows us to choose an ordering such that `Rzz` gates will
             immediately precede SWAP gates to leverage CNOT cancellation.
-        num_qubits: the number of qubits
-        local_correlators: list of paulis
         theta: The QAOA angles.
         qaoa_layers: The number of layers of the cost-operator and the mixer operator.
         initial_state: The initial state on which we apply layers of cost-operator
             and mixer.
         mixer: The QAOA mixer. It will be applied as is onto the QAOA circuit. Therefore,
             its output must have the same ordering of qubits as its input.
-        swap_strategy: selected swap strategy
-        random_cut: A random cut, i.e., a series of 1 and 0 with the same length
-            as the number of qubits. If qubit `i` has a `1` then we flip its
-            initial state from `+` to `-`.
     """
 
     # Save the parameters of the original, total Hamiltonian 

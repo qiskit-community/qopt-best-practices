@@ -116,7 +116,7 @@ def apply_qaoa_layers(
 
 
 def create_qaoa_swap_circuit(
-    cost_operator: SparsePauliOp,
+    cost_operator: list[tuple[str, float]],
     swap_strategy: SwapStrategy,
     edge_coloring: dict = None,
     theta: list[float] = None,
@@ -124,49 +124,70 @@ def create_qaoa_swap_circuit(
     initial_state: QuantumCircuit = None,
     mixer: QuantumCircuit = None,
 ):
-    """Create the circuit for QAOA.
-
-    Notes: This circuit construction for QAOA works for quadratic terms in `Z` and will be
-    extended to first-order terms in `Z`. Higher-orders are not supported.
-
+    """
+    This method can only handle circuits with only 1-qubit or 2-qubit gates, due to the limitation in the function `apply_swap_strategy`, which can only handle 2-qubit gates. Given this constraint, we still have to treat the 1-qubit gates and 2-qubit gates separately. Suppose H = H1 + H2, where H1 has only 1-qubit gates, and H2 only 2-qubit gates.
+    
+    Strategy is
+        - create correspponding circuits for both H1 and H2
+        - `apply_swap_strategy` on the circuit of H2
+        - combine the two circuits
+        
     Args:
-        cost_operator: the cost operator.
-        swap_strategy: selected swap strategy
-        edge_coloring: A coloring of edges that should correspond to the coupling
-            map of the hardware. It defines the order in which we apply the Rzz
-            gates. This allows us to choose an ordering such that `Rzz` gates will
-            immediately precede SWAP gates to leverage CNOT cancellation.
+        num_qubits: the number of qubits
+        local_correlators: list of paulis
         theta: The QAOA angles.
-        qaoa_layers: The number of layers of the cost-operator and the mixer operator.
-        initial_state: The initial state on which we apply layers of cost-operator
-            and mixer.
-        mixer: The QAOA mixer. It will be applied as is onto the QAOA circuit. Therefore,
-            its output must have the same ordering of qubits as its input.
+        swap_strategy: selected swap strategy
+        random_cut: A random cut, i.e., a series of 1 and 0 with the same length
+            as the number of qubits. If qubit `i` has a `1` then we flip its
+            initial state from `+` to `-`.
     """
 
+    raise Exception("This method can only handle first order and second order Pauli Z terms.")
+    
+    # Save the parameters of the original, total Hamiltonian 
     num_qubits = cost_operator.num_qubits
+    gate_list = cost_operator.paulis
+    weights_list = cost_operator.coeffs
+    
+    # Prepare the separate two parts of the total Hamiltonian
+    cost_operator_order1_only = QuantumCircuit(num_qubits)
+    cost_operator_order2_only = []
 
-    if theta is not None:
-        gamma = theta[: len(theta) // 2]
-        beta = theta[len(theta) // 2:]
-        qaoa_layers = len(theta) // 2
-    else:
-        gamma = beta = None
-        qaoa_layers = qaoa_layers
+    # Create H2 as an operator
+    for pauli, gate_weight in zip(gate_list, weights_list):
+        if sum(pauli.x) == 0 and sum(pauli.z) == 2:
+            cost_operator_order2_only.append((pauli, gate_weight))
+    cost_operator_order2_only = SparsePauliOp(list(zip(*cost_operator_order2_only))[0], list(zip(*cost_operator_order2_only))[1])
 
-    # First, create the ansatz of 1 layer of QAOA without mixer
-    cost_layer = QAOAAnsatz(
-        cost_operator,
+    # Then, create H2 as a circuit, using the ansatz of 1 layer of QAOA without mixer
+    cost_layer_order2_only = QAOAAnsatz(
+        cost_operator_order2_only,
         reps=1,
         initial_state=QuantumCircuit(num_qubits),
         mixer_operator=QuantumCircuit(num_qubits),
     ).decompose()
 
-    # This will allow us to recover the permutation of the measurements that the swap introduce.
-    cost_layer.measure_all()
+    # Save the gamma parameters used in H2, which will be the same as for the ansatz of H1
+    gamma = cost_layer_order2_only.parameters[0]
 
+    # Create ansatz for H1 
+    for pauli, gate_weight in zip(gate_list, weights_list):
+        
+        if sum(pauli.x) == 0 and sum(pauli.z) == 1:
+            print("pauli, gate_weight, gamma=", (pauli, gate_weight, gamma))
+            qubit_index = np.where(pauli.z == True)[0][0] 
+            cost_operator_order1_only.rz(gate_weight*gamma, qubit_index)
+    
+    # Before applying the swap_strategy to H2, we want to recover the permutation of the measurements that the swap introduce.
+    cost_layer_order2_only.measure_all()
+    
     # Now, apply the swap strategy for commuting pauli evolution gates
-    cost_layer = apply_swap_strategy(cost_layer, swap_strategy, edge_coloring)
+    cost_layer_order2_only  = apply_swap_strategy(cost_layer_order2_only, swap_strategy, edge_coloring)
+
+    # Combine the H1 ansatz with the optimized H2 ansatz
+    cost_layer = QuantumCircuit(num_qubits)
+    cost_layer.compose(cost_operator_order1_only, inplace=True)
+    cost_layer.compose(cost_layer_order2_only, inplace=True)
 
     # Compute the measurement map (qubit to classical bit).
     # we will apply this for qaoa_layers % 2 == 1.
@@ -174,8 +195,17 @@ def create_qaoa_swap_circuit(
         meas_map = make_meas_map(cost_layer)
     else:
         meas_map = {idx: idx for idx in range(num_qubits)}
-
+    
     cost_layer.remove_final_measurements()
+
+    # Assign variational parameters
+    if theta is not None:
+        gamma = theta[: len(theta) // 2]
+        beta = theta[len(theta) // 2 :]
+        qaoa_layers = len(theta) // 2
+    else:
+        gamma = beta = None
+        qaoa_layers = qaoa_layers
 
     # Finally, introduce the mixer circuit and add measurements following measurement map
     circuit = apply_qaoa_layers(

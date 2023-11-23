@@ -125,17 +125,33 @@ def create_qaoa_swap_circuit(
     mixer: QuantumCircuit = None,
 ):
     """
-    This method can only handle circuits with only 1-qubit or 2-qubit gates, due to the limitation in the function `apply_swap_strategy`, which can only handle 2-qubit gates. Given this constraint, we still have to treat the 1-qubit gates and 2-qubit gates separately. Suppose H = H1 + H2, where H1 has only 1-qubit gates, and H2 only 2-qubit gates.
-    
+    Create the circuit for QAOA.
+    Notes: This circuit construction for QAOA works for quadratic terms in `Z` as well as
+    first-order terms in `Z`. Higher-orders are not supported due to the limitation 
+    in the function `apply_swap_strategy`, which can only handle 2-qubit gates. 
+    Given this constraint, we still have to treat the 1-qubit gates and 2-qubit gates separately. 
+    Suppose H = H1 + H2, where H1 has only 1-qubit gates, and H2 only 2-qubit gates.
+
     Strategy is
         - create correspponding circuits for both H1 and H2
         - `apply_swap_strategy` on the circuit of H2
         - combine the two circuits
         
     Args:
+        cost_operator: the cost operator.
+        swap_strategy: selected swap strategy
+        edge_coloring: A coloring of edges that should correspond to the coupling
+            map of the hardware. It defines the order in which we apply the Rzz
+            gates. This allows us to choose an ordering such that `Rzz` gates will
+            immediately precede SWAP gates to leverage CNOT cancellation.
         num_qubits: the number of qubits
         local_correlators: list of paulis
         theta: The QAOA angles.
+        qaoa_layers: The number of layers of the cost-operator and the mixer operator.
+        initial_state: The initial state on which we apply layers of cost-operator
+            and mixer.
+        mixer: The QAOA mixer. It will be applied as is onto the QAOA circuit. Therefore,
+            its output must have the same ordering of qubits as its input.
         swap_strategy: selected swap strategy
         random_cut: A random cut, i.e., a series of 1 and 0 with the same length
             as the number of qubits. If qubit `i` has a `1` then we flip its

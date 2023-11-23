@@ -142,8 +142,6 @@ def create_qaoa_swap_circuit(
             initial state from `+` to `-`.
     """
 
-    raise Exception("This method can only handle first order and second order Pauli Z terms.")
-    
     # Save the parameters of the original, total Hamiltonian 
     num_qubits = cost_operator.num_qubits
     gate_list = cost_operator.paulis
@@ -155,7 +153,9 @@ def create_qaoa_swap_circuit(
 
     # Create H2 as an operator
     for pauli, gate_weight in zip(gate_list, weights_list):
-        if sum(pauli.x) == 0 and sum(pauli.z) == 2:
+        if sum(pauli.x) != 0 or sum(pauli.z) > 2:
+            raise Exception("This method can only handle first order and second order Pauli Z terms.")
+        if sum(pauli.z) == 2:
             cost_operator_order2_only.append((pauli, gate_weight))
     cost_operator_order2_only = SparsePauliOp(list(zip(*cost_operator_order2_only))[0], list(zip(*cost_operator_order2_only))[1])
 
@@ -173,7 +173,7 @@ def create_qaoa_swap_circuit(
     # Create ansatz for H1 
     for pauli, gate_weight in zip(gate_list, weights_list):
         
-        if sum(pauli.x) == 0 and sum(pauli.z) == 1:
+        if sum(pauli.z) == 1:
             print("pauli, gate_weight, gamma=", (pauli, gate_weight, gamma))
             qubit_index = np.where(pauli.z == True)[0][0] 
             cost_operator_order1_only.rz(gate_weight*gamma, qubit_index)

@@ -174,7 +174,6 @@ def create_qaoa_swap_circuit(
     for pauli, gate_weight in zip(gate_list, weights_list):
         
         if sum(pauli.z) == 1:
-            print("pauli, gate_weight, gamma=", (pauli, gate_weight, gamma))
             qubit_index = np.where(pauli.z == True)[0][0] 
             cost_operator_order1_only.rz(gate_weight*gamma, qubit_index)
     

@@ -2,6 +2,7 @@
 
 from unittest import TestCase
 import json
+import os
 
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 from qiskit.quantum_info import SparsePauliOp
@@ -16,7 +17,7 @@ class TestSwapStrategies(TestCase):
         super().setUp()
 
         # load data
-        graph_file = "data/graph_2layers_0seed.json"
+        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
 
         with open(graph_file, "r") as file:
             data = json.load(file)
@@ -25,9 +26,7 @@ class TestSwapStrategies(TestCase):
 
         self.hamiltonian = SparsePauliOp.from_list(self.mapped_paulis)
 
-        self.swap_strategy = SwapStrategy.from_line(
-            [i for i in range(self.hamiltonian.num_qubits)]
-        )
+        self.swap_strategy = SwapStrategy.from_line(list(range(self.hamiltonian.num_qubits)))
 
     def test_qaoa_circuit(self):
         """Test building the QAOA circuit."""

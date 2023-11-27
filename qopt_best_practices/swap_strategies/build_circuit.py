@@ -97,8 +97,7 @@ def apply_qaoa_layers(
         bind_dict = {cost_layer.parameters[0]: gamma[layer]}
         cost_layer_ = cost_layer.assign_parameters(bind_dict)
         bind_dict = {
-            mixer_layer.parameters[i]: beta[layer + i]
-            for i in range(mixer_layer.num_parameters)
+            mixer_layer.parameters[i]: beta[layer + i] for i in range(mixer_layer.num_parameters)
         }
         layer_mixer = mixer_layer.assign_parameters(bind_dict)
 
@@ -148,7 +147,7 @@ def create_qaoa_swap_circuit(
 
     if theta is not None:
         gamma = theta[: len(theta) // 2]
-        beta = theta[len(theta) // 2:]
+        beta = theta[len(theta) // 2 :]
         qaoa_layers = len(theta) // 2
     else:
         gamma = beta = None

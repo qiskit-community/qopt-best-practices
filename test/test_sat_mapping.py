@@ -27,9 +27,7 @@ class TestSwapStrategies(TestCase):
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
         self.mapped_graph = build_graph(self.mapped_paulis)
 
-        self.sat_mapping = {
-            int(key): value for key, value in data["SAT mapping"].items()
-        }
+        self.sat_mapping = {int(key): value for key, value in data["SAT mapping"].items()}
         self.min_k = data["min swap layers"]
         self.swap_strategy = SwapStrategy.from_line(
             [i for i in range(len(self.original_graph.nodes))]

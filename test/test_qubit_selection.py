@@ -1,33 +1,27 @@
-from unittest import TestCase
 import json
+import os
+from unittest import TestCase
 
 from qiskit.providers.fake_provider import FakeWashington
 
-from qopt_best_practices.utils import build_graph, build_paulis
-from qopt_best_practices.swap_strategies import *
-
-from qopt_best_practices.qubit_selection import (
-    BackendEvaluator,
-    find_lines,
-    evaluate_fidelity,
-)
+from qopt_best_practices.utils import build_max_cut_graph
+from qopt_best_practices.qubit_selection import BackendEvaluator, find_lines
 
 
 class TestQubitSelection(TestCase):
-
     """Unit test for QAOA workflow."""
 
     def setUp(self):
         super().setUp()
 
         # load data
-        graph_file = "data/graph_2layers_0seed.json"
+        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
 
         with open(graph_file, "r") as f:
             data = json.load(f)
 
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
-        self.mapped_graph = build_graph(self.mapped_paulis)
+        self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
         self.backend = FakeWashington()
 
     def test_find_lines(self):

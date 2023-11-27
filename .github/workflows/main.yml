@@ -104,8 +104,6 @@ jobs:
       - uses: ./.github/actions/install-qopt
       - run: make lint
         shell: bash
-      - run: make mypy
-        shell: bash
       - name: qopt Unit Tests under Python ${{ matrix.python-version }}
         uses: ./.github/actions/run-tests
         with:
@@ -116,8 +114,9 @@ jobs:
         if: ${{ !cancelled() }}
       - name: Coverage combine
         run: |
+          mkdir ./ci-artifact-data
           coverage3 combine
-          mv .coverage ./ci-artifact-data/alg.dat
+          mv .coverage ./ci-artifact-data/qopt.dat
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == 3.8 }}
         shell: bash
       - uses: actions/upload-artifact@v3

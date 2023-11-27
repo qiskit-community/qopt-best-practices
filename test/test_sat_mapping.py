@@ -2,10 +2,11 @@ from unittest import TestCase
 import json
 
 import networkx as nx
+import os
 
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
-from qopt_best_practices.utils import build_graph, build_paulis
+from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
 from qopt_best_practices.sat_mapping import *
 
 
@@ -16,16 +17,16 @@ class TestSwapStrategies(TestCase):
         super().setUp()
 
         # load data
-        graph_file = "data/graph_2layers_0seed.json"
+        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
 
         with open(graph_file, "r") as f:
             data = json.load(f)
 
         self.original_graph = nx.from_edgelist(data["Original graph"])
-        self.original_paulis = build_paulis(self.original_graph)
+        self.original_paulis = build_max_cut_paulis(self.original_graph)
 
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
-        self.mapped_graph = build_graph(self.mapped_paulis)
+        self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
 
         self.sat_mapping = {
             int(key): value for key, value in data["SAT mapping"].items()

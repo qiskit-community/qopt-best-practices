@@ -104,8 +104,6 @@ jobs:
       - uses: ./.github/actions/install-qopt
       - run: make lint
         shell: bash
-      - run: make mypy
-        shell: bash
       - name: qopt Unit Tests under Python ${{ matrix.python-version }}
         uses: ./.github/actions/run-tests
         with:

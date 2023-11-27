@@ -20,15 +20,18 @@ else
 	CONCURRENCY := $(shell echo "$(NPROCS) 2" | awk '{printf "%.0f", $$1 / $$2}')
 endif
 
-.PHONY: lint black test test_ci coverage clean
+.PHONY: lint style black test test_ci coverage clean
 
-all_check: lint
+all_check: style lint
 
 lint:
 	pylint -rn qopt_best_practices test
 
 black:
 	python -m black qopt_best_practices test
+
+style:
+	python -m black --check qopt_best_practices test
 
 test:
 	python -m unittest discover -v test

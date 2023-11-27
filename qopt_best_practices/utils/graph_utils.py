@@ -3,6 +3,7 @@
 from __future__ import annotations
 import networkx as nx
 
+
 def build_max_cut_graph(paulis: list[tuple[str, float]]) -> nx.Graph:
     """Create a graph by parsing the pauli strings.
 

@@ -1,3 +1,5 @@
+"""Tests for SAT Mapping Utils"""
+
 from unittest import TestCase
 import json
 

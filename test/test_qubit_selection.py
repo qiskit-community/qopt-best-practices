@@ -1,6 +1,7 @@
+"""Tests for Qubit Selection Utils"""
+
 from unittest import TestCase
 import json
-
 from qiskit.providers.fake_provider import FakeWashington
 
 from qopt_best_practices.utils import build_graph, build_paulis

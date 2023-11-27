@@ -15,7 +15,7 @@ def evaluate_sparse_pauli(state: int, observable: SparsePauliOp) -> complex:
 
 
 def qaoa_sampler_cost_fun(params, ansatz, hamiltonian, sampler):
-
+    """Standard sampler-based QAOA cost function to be plugged into optimizer routines."""
     job = sampler.run(ansatz, params)
     sampler_result = job.result()
     sampled = sampler_result.quasi_dists[0]

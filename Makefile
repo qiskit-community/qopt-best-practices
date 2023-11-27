@@ -31,7 +31,7 @@ black:
 	python -m black qopt_best_practices test
 
 style:
-	python -m black --check qiskit_algorithms test
+	python -m black --check qopt_best_practices test
 
 test:
 	python -m unittest discover -v test

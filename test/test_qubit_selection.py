@@ -1,3 +1,5 @@
+"""Tests for Qubit Selection Utils"""
+
 import json
 import os
 from unittest import TestCase
@@ -17,8 +19,8 @@ class TestQubitSelection(TestCase):
         # load data
         graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
 
-        with open(graph_file, "r") as f:
-            data = json.load(f)
+        with open(graph_file, "r") as file:
+            data = json.load(file)
 
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
         self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
@@ -38,7 +40,7 @@ class TestQubitSelection(TestCase):
 
         path_finder = BackendEvaluator(self.backend)
 
-        path, fidelity, num_subsets = path_finder.evaluate(len(self.mapped_graph))
+        path, _, _ = path_finder.evaluate(len(self.mapped_graph))
 
         expected_path = [30, 31, 32, 36, 51, 50, 49, 48, 47, 35]
 

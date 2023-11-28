@@ -1,4 +1,5 @@
 import json
+
 file = "data/hardware_native_127.json"
 data = json.load(open(file, "r"))
 paulis = data["paulis"]
@@ -18,12 +19,14 @@ qaoa_circ.measure_all()
 print(qaoa_circ.num_parameters)
 
 from qiskit import transpile
+
 basis_gates = ["rz", "sx", "x", "ecr"]
 # Now transpile to sx, rz, x, cx basis
 qaoa_circ = transpile(qaoa_circ, basis_gates=basis_gates)
 print("transpilation done")
 
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Options
+
 service = QiskitRuntimeService(channel="ibm_quantum")
 backend = service.get_backend("ibm_nazca")
 options = Options()

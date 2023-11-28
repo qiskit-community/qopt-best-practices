@@ -1,4 +1,3 @@
-
 """A class to solve the SWAP gate insertion initial mapping problem
 using the SAT approach from https://arxiv.org/abs/2212.05666.
 """
@@ -152,22 +151,16 @@ class SATMapper:
                 if status:
                     # If the SAT problem is satisfiable, convert the solution to a mapping.
                     mapping = [vid2mapping[idx] for idx in sol if idx > 0]
-                    binary_search_results[num_layers] = SATResult(
-                        status, sol, mapping, e_time
-                    )
+                    binary_search_results[num_layers] = SATResult(status, sol, mapping, e_time)
                     max_layers = num_layers
                 else:
                     # If the SAT problem is unsatisfiable, return the last satisfiable solution.
-                    binary_search_results[num_layers] = SATResult(
-                        status, sol, [], e_time
-                    )
+                    binary_search_results[num_layers] = SATResult(status, sol, [], e_time)
                     min_layers = num_layers + 1
 
         return binary_search_results
 
-    def remap_graph_with_sat(
-        self, graph: nx.Graph, swap_strategy
-    ) -> tuple[int, dict, list]:
+    def remap_graph_with_sat(self, graph: nx.Graph, swap_strategy) -> tuple[int, dict, list]:
         """Applies the SAT mapping.
 
         Note the returned edge map `{k: v}` means that node `k` in the original

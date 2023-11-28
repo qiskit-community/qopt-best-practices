@@ -6,9 +6,7 @@ long_description = """Repository for best practices in quantum optimization."""
 with open("requirements.txt") as f:
     REQUIREMENTS = f.read().splitlines()
 
-VERSION_PATH = os.path.join(
-    os.path.dirname(__file__), "qopt_best_practices", "VERSION.txt"
-)
+VERSION_PATH = os.path.join(os.path.dirname(__file__), "qopt_best_practices", "VERSION.txt")
 with open(VERSION_PATH, "r") as version_file:
     VERSION = version_file.read().strip()
 
@@ -37,9 +35,7 @@ setuptools.setup(
         "Topic :: Scientific/Engineering",
     ],
     keywords="qiskit quantum optimization",
-    packages=setuptools.find_packages(
-        include=["qopt_best_practices", "qopt_best_practices.*"]
-    ),
+    packages=setuptools.find_packages(include=["qopt_best_practices", "qopt_best_practices.*"]),
     install_requires=REQUIREMENTS,
     include_package_data=True,
     python_requires=">=3.7",

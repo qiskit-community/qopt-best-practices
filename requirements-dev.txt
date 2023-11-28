@@ -1,2 +1,5 @@
+coverage>=4.4.0,<7.0
 black[jupyter]~=22.0
 pylint>=2.15.0
+ddt>=1.2.0,!=1.4.0,!=1.4.3
+stestr>=2.0.0

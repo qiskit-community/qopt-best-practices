@@ -20,7 +20,7 @@ PASSES = {
     },
     "staggered_XX": {
         "spacings": [0.25, 0.5, 0.25],
-        "alt_spacings": [0.25, 0.25, 0.25, 0.25, 0],
+        "alt_spacings": [0.5, 0.5, 0],
         "dd_sequences": [XGate(), XGate()],
     },
     "XY4": {

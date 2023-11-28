@@ -30,3 +30,12 @@ class TestGraphRoundTrip(TestCase):
             graph2 = build_max_cut_graph(build_max_cut_paulis(graph1))
 
             self.assertTrue(self._test_edge_equality(graph1, graph2))
+
+    def test_weighted_graph(self):
+        """Test the construction of a weighted graph."""
+
+        graph = build_max_cut_graph([("IIZZ", 1), ("IZZI", -1), ("ZIZI", 1)])
+
+        self.assertEqual(graph.get_edge_data(0, 1)["weight"], 1)
+        self.assertEqual(graph.get_edge_data(1, 2)["weight"], -1)
+        self.assertEqual(graph.get_edge_data(1, 3)["weight"], 1)

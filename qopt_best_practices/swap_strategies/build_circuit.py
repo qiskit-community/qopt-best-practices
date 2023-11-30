@@ -1,6 +1,8 @@
 """Circuit utils"""
 
-from qiskit.circuit import QuantumCircuit, ClassicalRegister
+from __future__ import annotations
+
+from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 
 from qiskit.transpiler import PassManager
@@ -53,7 +55,7 @@ def apply_swap_strategy(
     return pm_pre.run(circuit)
 
 
-def apply_qaoa_layers(
+def apply_qaoa_layers(  # pylint: disable=too-many-arguments,too-many-locals
     cost_layer: QuantumCircuit,
     meas_map: dict,
     num_layers: int,
@@ -62,7 +64,7 @@ def apply_qaoa_layers(
     initial_state: QuantumCircuit = None,
     mixer: QuantumCircuit = None,
 ):
-    """Construct the QAOA circuit.
+    """Applies QAOA layers to construct circuit.
 
     First, the initial state is applied. If `initial_state` is None we begin in the
     initial superposition state. Next, we alternate between layers of the cot operator
@@ -97,8 +99,7 @@ def apply_qaoa_layers(
         bind_dict = {cost_layer.parameters[0]: gamma[layer]}
         cost_layer_ = cost_layer.assign_parameters(bind_dict)
         bind_dict = {
-            mixer_layer.parameters[i]: beta[layer + i]
-            for i in range(mixer_layer.num_parameters)
+            mixer_layer.parameters[i]: beta[layer + i] for i in range(mixer_layer.num_parameters)
         }
         layer_mixer = mixer_layer.assign_parameters(bind_dict)
 
@@ -114,9 +115,8 @@ def apply_qaoa_layers(
 
     return new_circuit
 
-
-def create_qaoa_swap_circuit(
-    cost_operator: list[tuple[str, float]],
+def create_qaoa_swap_circuit(  # pylint: disable=too-many-arguments
+    cost_operator: SparsePauliOp,
     swap_strategy: SwapStrategy,
     edge_coloring: dict = None,
     theta: list[float] = None,

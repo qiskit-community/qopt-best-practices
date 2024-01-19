@@ -22,6 +22,8 @@ def find_lines(length: int, backend, coupling_map: CouplingMap | None = None) ->
     # might make sense to make backend the only input for simplicity
     if coupling_map is None:
         coupling_map = CouplingMap(backend.configuration().coupling_map)
+    if not coupling_map.is_symmetric:
+        coupling_map.make_symmetric()
 
     all_paths = rx.all_pairs_all_simple_paths(
         coupling_map.graph,

@@ -2,10 +2,13 @@
 to evaluate 2-qubit gate fidelity."""
 
 from __future__ import annotations
+from qiskit.providers import Backend
+from rustworkx import EdgeList
 
-# TODO: backend & edges typehint. Currently, only BackendV1 is supported
-#       Might make sense to extend to BackendV2 for generality
-def evaluate_fidelity(path: list[int], backend, edges) -> float:
+TWO_Q_GATES = ["cx", "ecr", "cz"]
+
+
+def evaluate_fidelity(path: list[int], backend: Backend, edges: EdgeList) -> float:
     """Evaluates fidelity on a given list of qubits based on the two-qubit gate error
     for a specific backend.
 
@@ -16,11 +19,9 @@ def evaluate_fidelity(path: list[int], backend, edges) -> float:
     two_qubit_fidelity = {}
     props = backend.properties()
 
-    if "cx" in backend.configuration().basis_gates:
-        gate_name = "cx"
-    elif "ecr" in backend.configuration().basis_gates:
-        gate_name = "ecr"
-    else:
+    try:
+        gate_name = list(set(TWO_Q_GATES).intersection(backend.basis_gates))[0]
+    except IndexError:
         raise ValueError("Could not identify two-qubit gate")
 
     for edge in edges:

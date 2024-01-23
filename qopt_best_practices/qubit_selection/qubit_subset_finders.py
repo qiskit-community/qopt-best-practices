@@ -8,6 +8,7 @@ import rustworkx as rx
 from qiskit.transpiler import CouplingMap
 from qiskit.providers import Backend
 
+
 def find_lines(length: int, backend: Backend) -> list[int]:
     """Finds all possible lines of length `length` for a specific backend topology.
 

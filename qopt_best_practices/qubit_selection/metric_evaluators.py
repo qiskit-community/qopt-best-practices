@@ -17,19 +17,18 @@ def evaluate_fidelity(path: list[int], backend: Backend, edges: EdgeList) -> flo
     """
 
     two_qubit_fidelity = {}
-    props = backend.properties()
+    target = backend.target
 
     try:
-        gate_name = list(set(TWO_Q_GATES).intersection(backend.basis_gates))[0]
+        gate_name = list(set(TWO_Q_GATES).intersection(backend.operation_names))[0]
     except IndexError:
         raise ValueError("Could not identify two-qubit gate")
 
     for edge in edges:
         try:
-            cx_error = props.gate_error(gate_name, edge)
-
+            cx_error = target[gate_name][edge].error
         except:  # pylint: disable=bare-except
-            cx_error = props.gate_error(gate_name, edge[::-1])
+            cx_error = target[gate_name][edge[::-1]].error
 
         two_qubit_fidelity[tuple(edge)] = 1 - cx_error
 

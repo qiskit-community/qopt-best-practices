@@ -18,7 +18,7 @@ def find_lines(length: int, backend: Backend) -> list[int]:
         The found paths.
     """
 
-    coupling_map = CouplingMap(backend.configuration().coupling_map)
+    coupling_map = CouplingMap(backend.coupling_map)
     if not coupling_map.is_symmetric:
         coupling_map.make_symmetric()
 

@@ -3,12 +3,12 @@ to evaluate 2-qubit gate fidelity."""
 
 from __future__ import annotations
 from qiskit.providers import Backend
-from rustworkx import EdgeList
+import rustworkx as rx
 
 TWO_Q_GATES = ["cx", "ecr", "cz"]
 
 
-def evaluate_fidelity(path: list[int], backend: Backend, edges: EdgeList) -> float:
+def evaluate_fidelity(path: list[int], backend: Backend, edges: rx.EdgeList) -> float:
     """Evaluates fidelity on a given list of qubits based on the two-qubit gate error
     for a specific backend.
 

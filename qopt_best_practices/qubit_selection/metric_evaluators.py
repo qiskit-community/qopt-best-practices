@@ -21,8 +21,8 @@ def evaluate_fidelity(path: list[int], backend: Backend, edges: EdgeList) -> flo
 
     try:
         gate_name = list(set(TWO_Q_GATES).intersection(backend.operation_names))[0]
-    except IndexError:
-        raise ValueError("Could not identify two-qubit gate")
+    except IndexError as exc:
+        raise ValueError("Could not identify two-qubit gate") from exc
 
     for edge in edges:
         try:

@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from qiskit.transpiler import CouplingMap
+from qiskit.providers import Backend
 
 from .metric_evaluators import evaluate_fidelity
 from .qubit_subset_finders import find_lines
@@ -17,10 +18,11 @@ class BackendEvaluator:
     transpiler pass.
     """
 
-    def __init__(self, backend):
-
+    def __init__(self, backend: Backend):
         self.backend = backend
-        self.coupling_map = CouplingMap(backend.configuration().coupling_map)
+        self.coupling_map = CouplingMap(backend.coupling_map)
+        if not self.coupling_map.is_symmetric:
+            self.coupling_map.make_symmetric()
 
     def evaluate(
         self,
@@ -42,7 +44,7 @@ class BackendEvaluator:
             subset_finder = find_lines
 
         # TODO: add callbacks
-        qubit_subsets = subset_finder(num_qubits, self.backend, self.coupling_map)
+        qubit_subsets = subset_finder(num_qubits, self.backend)
 
         # evaluating the subsets
         scores = [

@@ -6,10 +6,10 @@ import numpy as np
 import rustworkx as rx
 
 from qiskit.transpiler import CouplingMap
+from qiskit.providers import Backend
 
-# TODO: backend typehint. Currently, only BackendV1 is supported
-#       Might make sense to extend to BackendV2 for generality
-def find_lines(length: int, backend, coupling_map: CouplingMap | None = None) -> list[int]:
+
+def find_lines(length: int, backend: Backend) -> list[int]:
     """Finds all possible lines of length `length` for a specific backend topology.
 
     This method can take quite some time to run on large devices since there
@@ -19,9 +19,9 @@ def find_lines(length: int, backend, coupling_map: CouplingMap | None = None) ->
         The found paths.
     """
 
-    # might make sense to make backend the only input for simplicity
-    if coupling_map is None:
-        coupling_map = CouplingMap(backend.configuration().coupling_map)
+    coupling_map = CouplingMap(backend.coupling_map)
+    if not coupling_map.is_symmetric:
+        coupling_map.make_symmetric()
 
     all_paths = rx.all_pairs_all_simple_paths(
         coupling_map.graph,

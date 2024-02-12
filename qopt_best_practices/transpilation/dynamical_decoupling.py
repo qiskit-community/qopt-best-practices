@@ -25,12 +25,12 @@ PASSES = {
     },
     "XY4": {
         "spacings": [0.125, 0.25, 0.25, 0.25, 0.125],
-        "alt_spacings": None,  # TODO Check
+        "alt_spacings": [0.125, 0.25, 0.25, 0.25, 0.125],
         "dd_sequences": [XGate(), YGate(), XGate(), YGate()],
     },
     "XX": {
         "spacings": [0.25, 0.5, 0.25],
-        "alt_spacings": None,  # TODO Check
+        "alt_spacings": [0.25, 0.5, 0.25],
         "dd_sequences": [XGate(), XGate()],
     },
 }
@@ -40,6 +40,7 @@ def dd_pass_manager(
     backend,
     dd_sequence: Optional[str] = None,
     dd_config: Optional[Dict] = None,
+    durations: Optional[DynamicCircuitInstructionDurations] = None,
 ):
     """Make a pass-manager that inserts a Dynamical Decoupling sequence into a circuit.
 
@@ -54,16 +55,15 @@ def dd_pass_manager(
         dd_config: If users do not want to use a preset DD configuration then they can
             specify the arguments to `PadDynamicalDecoupling` themselves. The config should
             include the arguments `dd_sequences`, `spacings`, and `alt_spacings`.
+        durations: Can be used to override the durations from the backend.
     """
     min_seq_ratio = 1
 
-    durations = DynamicCircuitInstructionDurations.from_backend(backend)
+    if durations is None:
+        durations = DynamicCircuitInstructionDurations.from_backend(backend)
 
     # Some backends do not report the duration of the Y gate.
-    phys_qs = list(range(backend.num_qubits))
-    durations.update(DynamicCircuitInstructionDurations(
-        [("y", i, durations.get('x', i)) for i in phys_qs])
-    )
+    durations.update([("y", i, durations.get('x', i)) for i in range(backend.num_qubits)])
 
     if dd_config is None:
         dd_config = PASSES.get(dd_sequence, None)

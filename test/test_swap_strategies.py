@@ -1,10 +1,13 @@
+"""Tests for Swap Strategies"""
+
 from unittest import TestCase
 import json
+import os
 
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 from qiskit.quantum_info import SparsePauliOp
 
-from qopt_best_practices.swap_strategies import *
+from qopt_best_practices.swap_strategies import create_qaoa_swap_circuit
 
 
 class TestSwapStrategies(TestCase):
@@ -14,20 +17,19 @@ class TestSwapStrategies(TestCase):
         super().setUp()
 
         # load data
-        graph_file = "data/graph_2layers_0seed.json"
+        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
 
-        with open(graph_file, "r") as f:
-            data = json.load(f)
+        with open(graph_file, "r") as file:
+            data = json.load(file)
 
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
 
-        self.swap_strategy = SwapStrategy.from_line(
-            [i for i in range(len(self.original_graph.nodes))]
-        )
-
         self.hamiltonian = SparsePauliOp.from_list(self.mapped_paulis)
 
+        self.swap_strategy = SwapStrategy.from_line(list(range(self.hamiltonian.num_qubits)))
+
     def test_qaoa_circuit(self):
+        """Test building the QAOA circuit."""
 
         edge_coloring = {
             (idx, idx + 1): (idx + 1) % 2 for idx in range(self.hamiltonian.num_qubits)

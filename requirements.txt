@@ -1,2 +1,4 @@
 python-sat
 networkx
+qiskit>=1.0
+qiskit-ibm-runtime

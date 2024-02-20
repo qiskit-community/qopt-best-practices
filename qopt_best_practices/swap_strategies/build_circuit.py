@@ -93,7 +93,7 @@ def apply_qaoa_layers(  # pylint: disable=too-many-arguments,too-many-locals
         mixer_layer = mixer
     else:
         mixer_layer = QuantumCircuit(num_qubits)
-        mixer_layer.rx(beta[0], range(num_qubits))
+        mixer_layer.rx(-2 * beta[0], range(num_qubits))
 
     for layer in range(num_layers):
         bind_dict = {cost_layer.parameters[0]: gamma[layer]}

@@ -4,7 +4,8 @@ import json
 import os
 from unittest import TestCase
 
-from qiskit.providers.fake_provider import FakeSherbrooke, ConfigurableFakeBackend
+from qiskit_ibm_runtime.fake_provider import FakeSherbrooke
+from qiskit.providers.fake_provider import GenericBackendV2
 
 
 from qopt_best_practices.utils import build_max_cut_graph
@@ -39,9 +40,7 @@ class TestQubitSelection(TestCase):
     def test_find_lines_directed(self):
         "Test backend with directed (asymmetric) coupling map"
 
-        directed_fake_backend = ConfigurableFakeBackend(
-            "test", 4, coupling_map=[[0, 1], [1, 2], [3, 2], [3, 0]]
-        )
+        directed_fake_backend = GenericBackendV2(4, coupling_map=[[0, 1], [1, 2], [3, 2], [3, 0]])
         lines = find_lines(3, backend=directed_fake_backend)
 
         expected_lines = [[0, 1, 2], [0, 3, 2], [1, 2, 3], [1, 0, 3]]

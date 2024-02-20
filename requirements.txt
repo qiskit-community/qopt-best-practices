@@ -1,5 +1,4 @@
 python-sat
 networkx
-# preventively pinning qiskit in anticipation of
-# breaking changes in 1.0
-qiskit>=0.44,<1.0
+qiskit>=1.0
+qiskit-ibm-runtime

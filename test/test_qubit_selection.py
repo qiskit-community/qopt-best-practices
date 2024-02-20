@@ -4,7 +4,7 @@ import json
 import os
 from unittest import TestCase
 
-from qiskit.providers.fake_provider import FakeSherbrooke, ConfigurableFakeBackend
+from qiskit_ibm_runtime.fake_provider import FakeSherbrooke, ConfigurableFakeBackend
 
 
 from qopt_best_practices.utils import build_max_cut_graph

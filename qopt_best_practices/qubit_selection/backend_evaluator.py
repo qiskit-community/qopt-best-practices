@@ -20,7 +20,11 @@ class BackendEvaluator:
 
     def __init__(self, backend: Backend):
         self.backend = backend
-        self.coupling_map = CouplingMap(backend.coupling_map)
+        if backend.version == 2:
+            coupling_map = CouplingMap(backend.coupling_map)
+        else:
+            coupling_map = CouplingMap(backend.configuration().coupling_map)
+        self.coupling_map = coupling_map
         if not self.coupling_map.is_symmetric:
             self.coupling_map.make_symmetric()
 

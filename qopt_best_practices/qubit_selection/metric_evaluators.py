@@ -42,7 +42,7 @@ def evaluate_fidelity(path: list[int], backend: Backend, edges: rx.EdgeList) -> 
         for edge in edges:
             try:
                 cx_error = props.gate_error(gate_name, edge)
-            except:
+            except:  # pylint: disable=bare-except
                 cx_error = props.gate_error(gate_name, edge[::-1])
 
             two_qubit_fidelity[tuple(edge)] = 1 - cx_error

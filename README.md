@@ -43,6 +43,36 @@ can be applied to best run quantum optimization algorithms on real hardware:
 3. Application of SWAP strategies -> `swap_strategies`
 4. QAOA cost function -> `cost_function`
 
+## Notation Conventions
+
+The convention in this repository is that the (depth-one) QAOA should create an Ansatz of the form:
+
+$$
+\begin{align}
+\exp\left(-i\beta H_m\right)\exp\left(-i\gamma H_c\right)\vert+\rangle^{\otimes n}
+\end{align}
+$$
+
+to **minimize** the energy of $H_c$. Since we are minimizing $\\langle H_c\\rangle$, 
+the initial state of the ansatz should be the ground state of the mixer $H_m$. This enforces:
+
+$$
+\\begin{align}
+H_m=-\\sum_iX_i.
+\\end{align}
+$$
+
+As cost operator we apply:
+
+$$
+\\begin{align}
+H_c=\\sum_{i,j=0}^{n-1}w_{i,j}Z_iZ_j
+\\end{align}
+$$
+
+At the circuit level, these definitions imply that the exponential of the mixer is built 
+with $R_x(-2\\beta)$ rotations and the exponential of the cost operator is built from $R_{zz}(2\\gamma w_{i,j})$.
+
 
 ## References
 1. Sack, S. H., & Egger, D. J. (2023). Large-scale quantum approximate optimization on non-planar graphs with machine learning noise mitigation. arXiv preprint arXiv:2307.14427. [Link](https://arxiv.org/pdf/2307.14427.pdf).

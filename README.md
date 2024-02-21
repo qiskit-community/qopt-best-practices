@@ -43,7 +43,7 @@ can be applied to best run quantum optimization algorithms on real hardware:
 3. Application of SWAP strategies -> `swap_strategies`
 4. QAOA cost function -> `cost_function`
 
-## Notation Conventions
+## QAOA Formulation Convention
 
 The convention in this repository is that the (depth-one) QAOA should create an Ansatz of the form:
 

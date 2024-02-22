@@ -70,6 +70,8 @@ H_c=\\sum_{i,j=0}^{n-1}w_{i,j}Z_iZ_j
 \\end{align}
 $$
 
+where the sum runs over $i<j$.
+
 At the circuit level, these definitions imply that the exponential of the mixer is built 
 with $R_x(-2\\beta)$ rotations and the exponential of the cost operator is built from $R_{zz}(2\\gamma w_{i,j})$.
 

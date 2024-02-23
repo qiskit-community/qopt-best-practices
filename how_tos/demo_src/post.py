@@ -46,23 +46,6 @@ def plot_distribution(final_distribution):
     plt.show()
 
 
-# auxiliary function to load saved samples
-def load_data():
-    depth_one_heron, depth_zero_heron, depth_one_eagle, depth_zero_eagle = {}, {}, {}, {}
-    for file in os.listdir("sampler_data/"):
-        with open(f"sampler_data/{file}", "r") as fin:
-            data = json.load(fin)
-
-        if file.startswith("heron"):
-            depth_one_heron.update(data["depth-one"])
-            depth_zero_heron.update(data["depth-zero"])
-        else:
-            depth_one_eagle.update(data["depth-one"])
-            depth_zero_eagle.update(data["depth-zero"])
-
-    return depth_one_heron, depth_zero_heron, depth_one_eagle, depth_zero_eagle
-
-
 # auxiliary function to convert bit-strings to objective values
 def samples_to_objective_values(samples, qp):
     """Convert the samples to values of the objective function."""
@@ -75,6 +58,28 @@ def samples_to_objective_values(samples, qp):
         objective_values[fval] += prob
 
     return objective_values
+
+
+# auxiliary function to load saved samples
+def load_data(qp):
+    depth_one_heron, depth_zero_heron, depth_one_eagle, depth_zero_eagle = {}, {}, {}, {}
+    for file in os.listdir("sampler_data/"):
+        with open(f"sampler_data/{file}", "r") as fin:
+            data = json.load(fin)
+
+        if file.startswith("heron"):
+            depth_one_heron.update(data["depth-one"])
+            depth_zero_heron.update(data["depth-zero"])
+        else:
+            depth_one_eagle.update(data["depth-one"])
+            depth_zero_eagle.update(data["depth-zero"])
+
+    depth_zero_heron = samples_to_objective_values(depth_zero_heron, qp)
+    depth_one_heron = samples_to_objective_values(depth_one_heron, qp)
+    depth_zero_eagle = samples_to_objective_values(depth_zero_eagle, qp)
+    depth_one_eagle = samples_to_objective_values(depth_one_eagle, qp)
+
+    return depth_one_heron, depth_zero_heron, depth_one_eagle, depth_zero_eagle
 
 
 # auxiliary function to load the QP from the saved Paulis

@@ -33,8 +33,11 @@ def plot_result(G, x):
 def plot_distribution(final_distribution):
     matplotlib.rcParams.update({'font.size': 10})
     final_bits = final_distribution.binary_probabilities()
-    position = np.argmax(np.abs(list(final_bits.values())))
-    
+    values = np.abs(list(final_bits.values()))
+    top_4_values = sorted(values, reverse = True)[:4]
+    positions = []
+    for value in top_4_values:
+        positions.append(np.where(values == value)[0])
     fig = plt.figure(figsize = (11,6))
     ax=fig.add_subplot(1,1,1)
     plt.xticks(rotation=45)
@@ -42,7 +45,8 @@ def plot_distribution(final_distribution):
     plt.xlabel("Bitstrings (reversed)")
     plt.ylabel("Probability")
     ax.bar(list(final_bits.keys()), list(final_bits.values()), color='tab:grey')
-    ax.get_children()[position].set_color('tab:purple') 
+    for p in positions:
+        ax.get_children()[int(p)].set_color('tab:purple')
     plt.show()
 
 

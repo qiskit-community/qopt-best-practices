@@ -1,7 +1,13 @@
+from collections import defaultdict
+import json
 import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import os
+
+from qiskit_optimization.applications import Maxcut
+
 
 # auxiliary functions to sample most likely bitstring
 def to_bitstring(integer, num_bits):
@@ -38,3 +44,86 @@ def plot_distribution(final_distribution):
     ax.bar(list(final_bits.keys()), list(final_bits.values()), color='tab:grey')
     ax.get_children()[position].set_color('tab:purple') 
     plt.show()
+
+
+# auxiliary function to load saved samples
+def load_data():
+    depth_one_heron, depth_zero_heron, depth_one_eagle, depth_zero_eagle = {}, {}, {}, {}
+    for file in os.listdir("sampler_data/"):
+        with open(f"sampler_data/{file}", "r") as fin:
+            data = json.load(fin)
+
+        if file.startswith("heron"):
+            depth_one_heron.update(data["depth-one"])
+            depth_zero_heron.update(data["depth-zero"])
+        else:
+            depth_one_eagle.update(data["depth-one"])
+            depth_zero_eagle.update(data["depth-zero"])
+
+    return depth_one_heron, depth_zero_heron, depth_one_eagle, depth_zero_eagle
+
+
+# auxiliary function to convert bit-strings to objective values
+def samples_to_objective_values(samples, qp):
+    """Convert the samples to values of the objective function."""
+    objective_values = defaultdict(float)
+    for bit_str, prob in samples.items():
+
+        # Qiskit use little endian hence the [::-1]
+        candidate_sol = [int(bit) for bit in bit_str[::-1]]
+        fval = qp.objective.evaluate(candidate_sol)
+        objective_values[fval] += prob
+
+    return objective_values
+
+
+# auxiliary function to load the QP from the saved Paulis
+def load_qp():
+
+    # First, load the Paulis that encode the MaxCut problem.
+    with open("data/125node_example_ising.txt", "r") as fin:
+        paulis, lines = [], fin.read()
+        for edge in lines.split("\n"):
+            try:
+                pauli, coefficient = edge.split(", ")
+                paulis.append((pauli, float(coefficient)))
+            except ValueError:
+                pass
+
+    # Next, convert the Paulis to a weighted graph.
+    wedges = []
+    for pauli_str, coefficient in paulis:
+        wedges.append([idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"] + [{"weight": coefficient}])
+
+    weighted_graph = nx.DiGraph(wedges)
+
+    # Create the Quadratic program to return form the weighted graph.
+    mc = Maxcut(weighted_graph)
+    qp = mc.to_quadratic_program()
+
+    # Finding the min and max requires CPLEX. If this is not installed we use
+    # hard coded values for the sake of the demo.
+    try:
+        from qiskit_optimization.algorithms import CplexOptimizer
+        from qiskit_optimization.problems.quadratic_objective import ObjSense
+
+        # Mximization gives the max cut
+        sol = CplexOptimizer().solve(qp)
+
+        # Minimization gives the min cut
+        qp2 = mc.to_quadratic_program()
+        qp2.objective._sense = ObjSense.MINIMIZE
+        sol2 = CplexOptimizer().solve(qp2)
+
+        max_cut, min_cut = sol.fval, sol2.fval
+    except:
+        max_cut, min_cut = 67, -63
+
+    return qp, max_cut, min_cut
+
+
+# auxiliary function to help plot cumulative distribution functions
+def plot_cdf(objective_values: dict, ax, label):
+    x_vals = sorted(objective_values.keys())
+    y_vals = np.cumsum([objective_values[x] for x in x_vals])
+    ax.plot(x_vals, y_vals, label=label)

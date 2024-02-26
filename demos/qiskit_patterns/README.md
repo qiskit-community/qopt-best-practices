@@ -1,4 +1,4 @@
-# Qiskit Patterns IBM Tech 2024 Lab Prep Work
+# Qiskit Patterns Lab Prep Work
 
 ## Requirements
 

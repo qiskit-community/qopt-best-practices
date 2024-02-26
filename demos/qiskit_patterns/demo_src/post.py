@@ -132,7 +132,18 @@ def load_qp():
 
 
 # auxiliary function to help plot cumulative distribution functions
-def plot_cdf(objective_values: dict, ax, label):
+def _plot_cdf(objective_values: dict, ax, label):
     x_vals = sorted(objective_values.keys())
     y_vals = np.cumsum([objective_values[x] for x in x_vals])
     ax.plot(x_vals, y_vals, label=label)
+    
+def plot_cdf(depth_zero, depth_one, max_cut, min_cut, ax, title):
+    _plot_cdf(depth_zero, ax, "Depth-zero")
+    _plot_cdf(depth_one, ax, "Depth-one")
+    ax.vlines(max_cut, 0, 1, "k", linestyle="--")
+    ax.vlines(max(list(depth_one.keys())), 0, 1, "C1", linestyle="--")
+    approx = 100 * (max(list(depth_one.keys())) - min_cut) / (max_cut - min_cut)
+    ax.set_title(title + f" {approx}%")
+    ax.set_xlabel("Objective function value")
+    ax.set_ylabel("Cumulative distribution function")
+    ax.legend(loc=2);

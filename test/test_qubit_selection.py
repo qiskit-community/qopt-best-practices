@@ -4,7 +4,7 @@ import json
 import os
 from unittest import TestCase
 
-from qiskit_ibm_runtime.fake_provider import FakeSherbrooke
+from qiskit_ibm_runtime.fake_provider import FakeSherbrooke, FakeHanoi, FakeHanoiV2
 from qiskit.providers.fake_provider import GenericBackendV2
 
 
@@ -20,17 +20,16 @@ class TestQubitSelection(TestCase):
 
         # load data
         graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
-
         with open(graph_file, "r") as file:
             data = json.load(file)
 
+        # 10 qubit graph
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
         self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
         self.backend = FakeSherbrooke()
 
     def test_find_lines(self):
         """Test backend evaluation"""
-
         paths = find_lines(len(self.mapped_graph), self.backend)
 
         self.assertEqual(len(paths), 1336)
@@ -38,8 +37,7 @@ class TestQubitSelection(TestCase):
         self.assertIsInstance(paths[0][0], int)
 
     def test_find_lines_directed(self):
-        "Test backend with directed (asymmetric) coupling map"
-
+        """Test backend with directed (asymmetric) coupling map"""
         directed_fake_backend = GenericBackendV2(4, coupling_map=[[0, 1], [1, 2], [3, 2], [3, 0]])
         lines = find_lines(3, backend=directed_fake_backend)
 
@@ -48,11 +46,18 @@ class TestQubitSelection(TestCase):
 
     def test_qubit_selection(self):
         """Test backend evaluation"""
-
         path_finder = BackendEvaluator(self.backend)
-
         path, _, _ = path_finder.evaluate(len(self.mapped_graph))
 
         expected_path = [45, 46, 47, 48, 49, 55, 68, 69, 70, 74]
-
         self.assertEqual(set(path), set(expected_path))
+
+    def test_qubit_selection_v1_v2(self):
+        """Test backend evaluation for 10 qubit line"""
+        backends = [FakeHanoi(), FakeHanoiV2()]
+
+        for backend in backends:
+            path_finder = BackendEvaluator(backend)
+            path, _, _ = path_finder.evaluate(len(self.mapped_graph))
+            expected_path = [1, 2, 4, 7, 8, 10, 11, 12, 13, 14]
+            self.assertEqual(set(path), set(expected_path))

@@ -23,30 +23,31 @@ def sample_most_likely(state_vector, num_bits):
     most_likely_bitstring.reverse()
     return np.asarray(most_likely_bitstring)
 
+
 # auxiliary function to plot graphs
 def plot_result(G, x):
-    colors = ['tab:grey' if i == 0 else 'tab:purple' for i in x]
+    colors = ["tab:grey" if i == 0 else "tab:purple" for i in x]
     pos, default_axes = nx.spring_layout(G), plt.axes(frameon=True)
     nx.draw_networkx(G, node_color=colors, node_size=600, alpha=0.8, pos=pos)
 
 
 def plot_distribution(final_distribution):
-    matplotlib.rcParams.update({'font.size': 10})
+    matplotlib.rcParams.update({"font.size": 10})
     final_bits = final_distribution.binary_probabilities()
     values = np.abs(list(final_bits.values()))
-    top_4_values = sorted(values, reverse = True)[:4]
+    top_4_values = sorted(values, reverse=True)[:4]
     positions = []
     for value in top_4_values:
         positions.append(np.where(values == value)[0])
-    fig = plt.figure(figsize = (11,6))
-    ax=fig.add_subplot(1,1,1)
+    fig = plt.figure(figsize=(11, 6))
+    ax = fig.add_subplot(1, 1, 1)
     plt.xticks(rotation=45)
     plt.title("Result Distribution")
     plt.xlabel("Bitstrings (reversed)")
     plt.ylabel("Probability")
-    ax.bar(list(final_bits.keys()), list(final_bits.values()), color='tab:grey')
+    ax.bar(list(final_bits.keys()), list(final_bits.values()), color="tab:grey")
     for p in positions:
-        ax.get_children()[int(p)].set_color('tab:purple')
+        ax.get_children()[int(p)].set_color("tab:purple")
     plt.show()
 
 
@@ -55,7 +56,6 @@ def samples_to_objective_values(samples, qp):
     """Convert the samples to values of the objective function."""
     objective_values = defaultdict(float)
     for bit_str, prob in samples.items():
-
         # Qiskit use little endian hence the [::-1]
         candidate_sol = [int(bit) for bit in bit_str[::-1]]
         fval = qp.objective.evaluate(candidate_sol)
@@ -88,7 +88,6 @@ def load_data(qp):
 
 # auxiliary function to load the QP from the saved Paulis
 def load_qp():
-
     # First, load the Paulis that encode the MaxCut problem.
     with open("data/125node_example_ising.txt", "r") as fin:
         paulis, lines = [], fin.read()
@@ -102,7 +101,10 @@ def load_qp():
     # Next, convert the Paulis to a weighted graph.
     wedges = []
     for pauli_str, coefficient in paulis:
-        wedges.append([idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"] + [{"weight": coefficient}])
+        wedges.append(
+            [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
+            + [{"weight": coefficient}]
+        )
 
     weighted_graph = nx.DiGraph(wedges)
 
@@ -136,7 +138,8 @@ def _plot_cdf(objective_values: dict, ax, label):
     x_vals = sorted(objective_values.keys())
     y_vals = np.cumsum([objective_values[x] for x in x_vals])
     ax.plot(x_vals, y_vals, label=label)
-    
+
+
 def plot_cdf(depth_zero, depth_one, max_cut, min_cut, ax, title):
     _plot_cdf(depth_zero, ax, "Depth-zero")
     _plot_cdf(depth_one, ax, "Depth-one")
@@ -146,4 +149,4 @@ def plot_cdf(depth_zero, depth_one, max_cut, min_cut, ax, title):
     ax.set_title(title + f" {approx}%")
     ax.set_xlabel("Objective function value")
     ax.set_ylabel("Cumulative distribution function")
-    ax.legend(loc=2);
+    ax.legend(loc=2)

@@ -5,6 +5,7 @@ import json
 import os
 import networkx as nx
 
+from qiskit.transpiler import CouplingMap
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
 from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
@@ -59,3 +60,36 @@ class TestSwapStrategies(TestCase):
         )
 
         self.assertTrue(nx.is_isomorphic(remapped_g, self.mapped_graph))
+
+    def test_deficient_strategy(self):
+        """Test that the SAT mapper works when the SWAP strategy is deficient.
+
+        Note: a deficient strategy does not result in full connectivity but
+        may still be useful.
+        """
+        cmap = CouplingMap([(idx, idx + 1) for idx in range(10)])
+
+        # This swap strategy is deficient but can route the graph below.
+        swaps = (
+            ((0, 1), (2, 3), (4, 5), (6, 7), (8, 9)),
+            ((1, 2), (3, 4), (5, 6), (7, 8)),
+            ((2, 3), (4, 5), (6, 7), (8, 9)),
+            (),
+            (),
+            (),
+            (),
+            (),
+        )
+        swap_strategy = SwapStrategy(cmap, swaps)
+        graph = nx.random_regular_graph(3, 10, seed=2)
+
+        mapper = SATMapper()
+
+        _, permutation, min_layer = mapper.remap_graph_with_sat(graph, swap_strategy)
+
+        # Spot check a few permutations.
+        self.assertEqual(permutation[0], 9)
+        self.assertEqual(permutation[8], 1)
+
+        # Crucially, if the `connectivity_matrix` in `find_initial_mappings` we get a wrong result.
+        self.assertEqual(min_layer, 3)

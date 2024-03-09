@@ -119,6 +119,10 @@ class SATMapper:
         # number of swap layers that satisfies the subgraph isomorphism problem.
         while min_layers < max_layers:
             num_layers = (min_layers + max_layers) // 2
+
+            # Create the connectivity matrix. Note that if the swap strategy cannot reach
+            # full connectivity then its distance matrix will have entries with -1. These
+            # entries must be treated as False.
             d_matrix = swap_strategy.distance_matrix
             connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(int)
             # Make a cnf for the adjacency constraint

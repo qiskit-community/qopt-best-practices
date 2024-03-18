@@ -86,7 +86,7 @@ class SATMapper:
             # use the maximum degree of the program graph - 2 as the lower bound.
             min_layers = max((d for _, d in program_graph.degree)) - 2
         if max_layers is None:
-            max_layers = num_nodes_g2 - 2
+            max_layers = num_nodes_g2 - 1
 
         variable_pool = IDPool(start_from=1)
         variables = np.array(
@@ -171,8 +171,7 @@ class SATMapper:
         graph gets mapped to node `v` in the Pauli strings.
         """
         num_nodes = len(graph.nodes)
-        results = self.find_initial_mappings(graph, swap_strategy, 0, num_nodes - 2)
-
+        results = self.find_initial_mappings(graph, swap_strategy, 0, num_nodes - 1)
         min_k = min((k for k, v in results.items() if v.satisfiable))
         edge_map = dict(results[min_k].mapping)
 

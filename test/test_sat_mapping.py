@@ -93,3 +93,14 @@ class TestSwapStrategies(TestCase):
 
         # Crucially, if the `connectivity_matrix` in `find_initial_mappings` we get a wrong result.
         self.assertEqual(min_layer, 3)
+
+    def test_full_connectivity(self):
+        """Test that the SAT mapper works when the SWAP strategy has full connectivity."""
+        graph = nx.random_regular_graph(3, 6, seed=1)  # fails
+        swap_strategy = SwapStrategy.from_line([i for i in range(6)])
+        sat_mapper = SATMapper()
+        remapped_g, sat_map, min_sat_layers = sat_mapper.remap_graph_with_sat(
+            graph=graph,
+            swap_strategy=swap_strategy,
+        )
+        self.assertEqual(min_sat_layers, 4)

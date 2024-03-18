@@ -96,7 +96,7 @@ class TestSwapStrategies(TestCase):
 
     def test_full_connectivity(self):
         """Test that the SAT mapper works when the SWAP strategy has full connectivity."""
-        graph = nx.random_regular_graph(3, 6, seed=1)  # fails
+        graph = nx.random_regular_graph(3, 6, seed=1)
         swap_strategy = SwapStrategy.from_line(list(range(6)))
         sat_mapper = SATMapper()
         _, _, min_sat_layers = sat_mapper.remap_graph_with_sat(

@@ -104,3 +104,18 @@ class TestSwapStrategies(TestCase):
             swap_strategy=swap_strategy,
         )
         self.assertEqual(min_sat_layers, 4)
+
+    def test_unable_to_remap(self):
+        """Test that the SAT mapper works when the SWAP strategy is unable to remap."""
+        graph = nx.random_regular_graph(3, 6, seed=1)
+        swap_strategy = SwapStrategy.from_line(list(range(6)))
+        cmap = CouplingMap([(idx, idx + 1) for idx in range(5)])
+        swap_strategy = SwapStrategy(cmap, [])
+        sat_mapper = SATMapper()
+        remapped_g, edge_map, min_sat_layers = sat_mapper.remap_graph_with_sat(
+            graph=graph,
+            swap_strategy=swap_strategy,
+        )
+        self.assertIsNone(remapped_g)
+        self.assertIsNone(edge_map)
+        self.assertIsNone(min_sat_layers)

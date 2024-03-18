@@ -172,8 +172,11 @@ class SATMapper:
         """
         num_nodes = len(graph.nodes)
         results = self.find_initial_mappings(graph, swap_strategy, 0, num_nodes - 1)
-        min_k = min((k for k, v in results.items() if v.satisfiable))
-        edge_map = dict(results[min_k].mapping)
-
-        remapped_graph = nx.relabel_nodes(graph, edge_map)
-        return remapped_graph, edge_map, min_k
+        solutions = [k for k, v in results.items() if v.satisfiable]
+        if len(solutions):
+            min_k = min(solutions)
+            edge_map = dict(results[min_k].mapping)
+            remapped_graph = nx.relabel_nodes(graph, edge_map)
+            return remapped_graph, edge_map, min_k
+        else:
+            return None, None, None

@@ -164,11 +164,19 @@ class SATMapper:
 
         return binary_search_results
 
-    def remap_graph_with_sat(self, graph: nx.Graph, swap_strategy) -> tuple[int, dict, list]:
+    def remap_graph_with_sat(
+        self, graph: nx.Graph, swap_strategy
+    ) -> tuple[int, dict, list] | tuple[None, None, None]:
         """Applies the SAT mapping.
 
-        Note the returned edge map `{k: v}` means that node `k` in the original
-        graph gets mapped to node `v` in the Pauli strings.
+        Args:
+            graph (nx.Graph): The graph to remap.
+            swap_strategy (SwapStrategy): The swap strategy to use to find the initial mapping.
+
+        Returns:
+            tuple: A tuple containing the remapped graph, the edge map, and the number of layers of the swap strategy that was used to find the initial mapping. If no solution is found then the tuple contains None for each element.
+            Note the returned edge map `{k: v}` means that node `k` in the original
+            graph gets mapped to node `v` in the Pauli strings.
         """
         num_nodes = len(graph.nodes)
         results = self.find_initial_mappings(graph, swap_strategy, 0, num_nodes - 1)

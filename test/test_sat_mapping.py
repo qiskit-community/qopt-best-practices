@@ -108,7 +108,6 @@ class TestSwapStrategies(TestCase):
     def test_unable_to_remap(self):
         """Test that the SAT mapper works when the SWAP strategy is unable to remap."""
         graph = nx.random_regular_graph(3, 6, seed=1)
-        swap_strategy = SwapStrategy.from_line(list(range(6)))
         cmap = CouplingMap([(idx, idx + 1) for idx in range(5)])
         swap_strategy = SwapStrategy(cmap, [])
         sat_mapper = SATMapper()

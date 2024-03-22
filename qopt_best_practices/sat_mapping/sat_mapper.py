@@ -174,7 +174,9 @@ class SATMapper:
             swap_strategy (SwapStrategy): The swap strategy to use to find the initial mapping.
 
         Returns:
-            tuple: A tuple containing the remapped graph, the edge map, and the number of layers of the swap strategy that was used to find the initial mapping. If no solution is found then the tuple contains None for each element.
+            tuple: A tuple containing the remapped graph, the edge map, and the number of layers of
+            the swap strategy that was used to find the initial mapping. If no solution is found
+            then the tuple contains None for each element.
             Note the returned edge map `{k: v}` means that node `k` in the original
             graph gets mapped to node `v` in the Pauli strings.
         """

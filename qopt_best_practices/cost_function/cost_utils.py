@@ -1,4 +1,5 @@
 """QAOA Cost function utils"""
+
 from collections.abc import Callable, Iterable
 
 import numpy as np
@@ -77,4 +78,3 @@ def _get_cvar_aggregation(alpha: float | None) -> Callable:
         return cvar / alpha
 
     return cvar_aggregation
-

@@ -10,7 +10,7 @@ from qiskit.transpiler.basepasses import TransformationPass
 
 class QAOAConstructionPass(TransformationPass):
     """Build the QAOAAnsatz from a transpiled cost operator.
-    
+
     This pass takes as input a single layer of a transpiled QAOA operator.
     It then repeats this layer the appropriate number of time and adds (i)
     the initial state, (ii) the mixer operator, and (iii) the measurements.
@@ -19,13 +19,13 @@ class QAOAConstructionPass(TransformationPass):
     """
 
     def __init__(
-        self, 
-        num_layers: int, 
-        init_state: Optional[QuantumCircuit] = None, 
-        mixer_layer: Optional[QuantumCircuit] = None
+        self,
+        num_layers: int,
+        init_state: Optional[QuantumCircuit] = None,
+        mixer_layer: Optional[QuantumCircuit] = None,
     ):
         """Initialize the pass
-        
+
         Limitations: The current implementation of the pass does not permute the mixer.
         Therefore mixers with local bias fields, such as in warm-start methods, will not
         result in the correct circuits.
@@ -33,7 +33,7 @@ class QAOAConstructionPass(TransformationPass):
         Args:
             num_layers: The number of QAOA layers to apply.
             init_state: The initial state to use. This must match the anticipated number
-                of qubits otherwise an error will be raised when `run` is called. If this 
+                of qubits otherwise an error will be raised when `run` is called. If this
                 is not given we will default to the equal superposition initial state.
             mixer_layer: The mixer layer to use. This must match the anticipated number
                 of qubits otherwise an error will be raised when `run` is called. If this
@@ -46,7 +46,6 @@ class QAOAConstructionPass(TransformationPass):
         self.mixer_layer = mixer_layer
 
     def run(self, cost_layer_dag):
-
         num_qubits = cost_layer_dag.num_qubits()
 
         # Make the initial state and the mixer.
@@ -84,35 +83,35 @@ class QAOAConstructionPass(TransformationPass):
         betas = ParameterVector("β", self.num_layers)
 
         # Add initial state
-        qaoa_circuit.compose(init_state, inplace = True)
+        qaoa_circuit.compose(init_state, inplace=True)
 
         # iterate over number of qaoa layers
         # and alternate cost/reversed cost and mixer
-        for layer in range(self.num_layers): 
-        
+        for layer in range(self.num_layers):
             bind_dict = {cost_layer.parameters[0]: gammas[layer]}
             bound_cost_layer = cost_layer.assign_parameters(bind_dict)
-            
+
             bind_dict = {mixer_layer.parameters[0]: betas[layer]}
             bound_mixer_layer = mixer_layer.assign_parameters(bind_dict)
-        
+
             if layer % 2 == 0:
                 # even layer -> append cost
                 qaoa_circuit.compose(bound_cost_layer, range(num_qubits), inplace=True)
             else:
                 # odd layer -> append reversed cost
-                qaoa_circuit.compose(bound_cost_layer.reverse_ops(), range(num_qubits), inplace=True)
-        
+                qaoa_circuit.compose(
+                    bound_cost_layer.reverse_ops(), range(num_qubits), inplace=True
+                )
+
             # the mixer layer is not reversed and not permuted.
             qaoa_circuit.compose(bound_mixer_layer, range(num_qubits), inplace=True)
-
-        self.property_set["test"] = "Test"
-        print("QAOAConstructionPass", self.property_set)
 
         if self.num_layers % 2 == 1:
             # iterate over layout permutations to recover measurements
             if self.property_set["virtual_permutation_layout"]:
-                for cidx, qidx in self.property_set["virtual_permutation_layout"].get_physical_bits().items():
+                for cidx, qidx in (
+                    self.property_set["virtual_permutation_layout"].get_physical_bits().items()
+                ):
                     qaoa_circuit.measure(qidx, cidx)
             else:
                 print("layout not found, assigining trivial layout")
@@ -121,5 +120,5 @@ class QAOAConstructionPass(TransformationPass):
         else:
             for idx in range(num_qubits):
                 qaoa_circuit.measure(idx, idx)
-    
+
         return circuit_to_dag(qaoa_circuit)

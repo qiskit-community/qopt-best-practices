@@ -22,6 +22,7 @@ def qaoa_swap_strategy(config: Dict[str, Any]):
     num_layers = config.get("num_layers", 1)
     swap_strategy = config.get("swap_strategy", None)
     edge_coloring = config.get("edge_coloring", None)
+    basis_gates = config.get("basis_gates", ["sx", "x", "rz", "cx", "id"])
 
     if swap_strategy is None:
         raise ValueError("No swap_strategy provided in config.")
@@ -38,7 +39,7 @@ def qaoa_swap_strategy(config: Dict[str, Any]):
                 swap_strategy,
                 edge_coloring,
             ),
-            HighLevelSynthesis(basis_gates=["x", "cx", "sx", "rz", "id"]),
+            HighLevelSynthesis(basis_gates=basis_gates),
             InverseCancellation(gates_to_cancel=[CXGate()]),
             QAOAConstructionPass(num_layers),
         ]

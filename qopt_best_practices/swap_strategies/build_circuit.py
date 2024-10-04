@@ -54,8 +54,8 @@ def apply_swap_strategy(
     )
     return pm_pre.run(circuit)
 
-
-def apply_qaoa_layers(  # pylint: disable=too-many-arguments,too-many-locals
+# pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
+def apply_qaoa_layers(
     cost_layer: QuantumCircuit,
     meas_map: dict,
     num_layers: int,

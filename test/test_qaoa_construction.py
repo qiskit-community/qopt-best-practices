@@ -41,7 +41,7 @@ class TestQAOAConstruction(TestCase):
 
     def test_depth_one(self):
         """Compare the pass with the SWAPs and ensure the measurements are ordered properly."""
-        qaoa_pm = qaoa_swap_strategy(self.config)
+        qaoa_pm = qaoa_swap_strategy_pm(self.config)
 
         cost_op_circ = QAOAAnsatz(
             self.cost_op, initial_state=QuantumCircuit(4), mixer_operator=QuantumCircuit(4)

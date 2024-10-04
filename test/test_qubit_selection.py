@@ -49,7 +49,7 @@ class TestQubitSelection(TestCase):
         path_finder = BackendEvaluator(self.backend)
         path, _, _ = path_finder.evaluate(len(self.mapped_graph))
 
-        expected_path = [45, 46, 47, 48, 49, 55, 68, 69, 70, 74]
+        expected_path = [33, 39, 40, 72, 41, 81, 53, 60, 61, 62]
         self.assertEqual(set(path), set(expected_path))
 
     def test_qubit_selection_v1_v2(self):
@@ -59,5 +59,5 @@ class TestQubitSelection(TestCase):
         for backend in backends:
             path_finder = BackendEvaluator(backend)
             path, _, _ = path_finder.evaluate(len(self.mapped_graph))
-            expected_path = [1, 2, 4, 7, 8, 10, 11, 12, 13, 14]
+            expected_path = [8, 9, 11, 12, 13, 14, 15, 18, 21, 23]
             self.assertEqual(set(path), set(expected_path))

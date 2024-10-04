@@ -4,6 +4,7 @@ from typing import Optional
 
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.circuit import QuantumCircuit, ParameterVector, Parameter
+from qiskit.dagcircuit import DAGCircuit
 from qiskit.transpiler import TranspilerError
 from qiskit.transpiler.basepasses import TransformationPass
 

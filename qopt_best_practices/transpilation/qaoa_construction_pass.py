@@ -45,7 +45,7 @@ class QAOAConstructionPass(TransformationPass):
         self.init_state = init_state
         self.mixer_layer = mixer_layer
 
-    def run(self, cost_layer_dag):
+    def run(self, cost_layer_dag: DAGCircuit):
         num_qubits = cost_layer_dag.num_qubits()
 
         # Make the initial state and the mixer.

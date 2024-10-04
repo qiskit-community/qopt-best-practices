@@ -116,7 +116,7 @@ def apply_qaoa_layers(  # pylint: disable=too-many-arguments,too-many-locals,too
     return new_circuit
 
 
-def create_qaoa_swap_circuit(  # pylint: disable=too-many-arguments
+def create_qaoa_swap_circuit(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     cost_operator: SparsePauliOp,
     swap_strategy: SwapStrategy,
     edge_coloring: dict = None,

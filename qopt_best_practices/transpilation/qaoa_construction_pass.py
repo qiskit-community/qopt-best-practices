@@ -76,7 +76,7 @@ class QAOAConstructionPass(TransformationPass):
                 f"{init_state.num_qubits} != {num_qubits}"
             )
 
-        # Note: converting to circuit is iniefficent. This should be update to DAG only work.
+        # Note: converting to circuit is inefficent. Update to DAG only.
         cost_layer = dag_to_circuit(cost_layer_dag)
         qaoa_circuit = QuantumCircuit(num_qubits, num_qubits)
 

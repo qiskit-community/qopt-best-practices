@@ -12,7 +12,7 @@ from qiskit.transpiler import PassManager
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
 from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
-from qopt_best_practices.transpilation.preset_qaoa_passmanager import qaoa_swap_strategy
+from qopt_best_practices.transpilation.preset_qaoa_passmanager import qaoa_swap_strategy_pm
 
 
 class TestQAOAConstruction(TestCase):

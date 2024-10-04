@@ -71,7 +71,7 @@ class QAOAConstructionPass(TransformationPass):
 
         if mixer_layer.num_qubits != num_qubits:
             raise TranspilerError(
-                "Number of qubits in the initial state does not match the number in the DAG. "
+                "Number of qubits in the mixer does not match the number in the DAG. "
                 f"{init_state.num_qubits} != {num_qubits}"
             )
 

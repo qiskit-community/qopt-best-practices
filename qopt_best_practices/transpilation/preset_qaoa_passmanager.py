@@ -13,7 +13,7 @@ from qiskit.circuit.library import CXGate
 from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
 
 
-def qaoa_swap_strategy(config: Dict[str, Any]):
+def qaoa_swap_strategy_pm(config: Dict[str, Any]):
     """Provide a pass manager to build the QAOA cirucit.
 
     This function will be extended in the future.

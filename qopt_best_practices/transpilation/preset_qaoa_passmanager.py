@@ -11,6 +11,7 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
 from qiskit.circuit.library import CXGate
 
 from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
+from qopt_best_practices.transpilation.swap_cancellation_pass import SwapToFinalMapping
 
 
 def qaoa_swap_strategy_pm(config: Dict[str, Any]):
@@ -39,6 +40,7 @@ def qaoa_swap_strategy_pm(config: Dict[str, Any]):
                 swap_strategy,
                 edge_coloring,
             ),
+            SwapToFinalMapping(),
             HighLevelSynthesis(basis_gates=basis_gates),
             InverseCancellation(gates_to_cancel=[CXGate()]),
             QAOAConstructionPass(num_layers),

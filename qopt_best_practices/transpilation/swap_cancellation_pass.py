@@ -18,7 +18,7 @@ class SwapToFinalMapping(TransformationPass):
 
         qmap = self.property_set["virtual_permutation_layout"]
 
-        qreg = dag.qregs["q"]
+        qreg = dag.qregs[next(iter(dag.qregs))]
 
         # This will remove SWAP gates that are applied before anything else
         # This remove is executed multiple times until there are no more SWAP

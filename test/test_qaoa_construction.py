@@ -9,10 +9,16 @@ from qiskit.circuit.library import QAOAAnsatz
 from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
+from qiskit.transpiler.passes import HighLevelSynthesis
+from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
+    SwapStrategy,
+    FindCommutingPauliEvolutions,
+    Commuting2qGateRouter,
+)
 
 from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
 from qopt_best_practices.transpilation.preset_qaoa_passmanager import qaoa_swap_strategy_pm
+from qopt_best_practices.transpilation.swap_cancellation_pass import SwapToFinalMapping
 
 
 class TestQAOAConstruction(TestCase):
@@ -95,3 +101,36 @@ class TestQAOAConstruction(TestCase):
         )
 
         self.assertAlmostEqual(value, expected)
+
+    def test_swap_construction(self):
+        """Test that redundent SWAP gates are removed."""
+        cost_op = SparsePauliOp.from_list(
+            [("IIIIZZ", 1), ("IIZZII", 1), ("ZZIIII", 1), ("IIZIIZ", 1)],
+        )
+
+        ansatz = QAOAAnsatz(
+            cost_op, reps=1, initial_state=QuantumCircuit(6), mixer_operator=QuantumCircuit(6)
+        )
+
+        # Test with the SWAP removal
+        qaoa_pm = PassManager(
+            [
+                HighLevelSynthesis(basis_gates=["PauliEvolution"]),
+                FindCommutingPauliEvolutions(),
+                Commuting2qGateRouter(SwapStrategy.from_line(range(6))),
+                SwapToFinalMapping(),
+            ]
+        )
+
+        self.assertEqual(qaoa_pm.run(ansatz).count_ops()["swap"], 2)
+
+        # Test without the SWAP removal
+        qaoa_pm = PassManager(
+            [
+                HighLevelSynthesis(basis_gates=["PauliEvolution"]),
+                FindCommutingPauliEvolutions(),
+                Commuting2qGateRouter(SwapStrategy.from_line(range(6))),
+            ]
+        )
+
+        self.assertEqual(qaoa_pm.run(ansatz).count_ops()["swap"], 3)

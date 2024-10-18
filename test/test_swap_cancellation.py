@@ -20,7 +20,7 @@ class TestSwapCancellation(TestCase):
         qc.swap(3, 2)
         qc.rzz(1.234, 1, 2)
         qc.swap(1, 2)
-        
+
         qreg = next(iter(qc.qregs))
 
         swap_pass = SwapToFinalMapping()

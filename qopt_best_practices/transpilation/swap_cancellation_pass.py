@@ -18,8 +18,6 @@ class SwapToFinalMapping(TransformationPass):
 
         qmap = self.property_set["virtual_permutation_layout"]
 
-        qreg = dag.qregs[next(iter(dag.qregs))]
-
         # This will remove SWAP gates that are applied before anything else
         # This remove is executed multiple times until there are no more SWAP
         # gates left to remove. Note: a more inteligent DAG traversal could
@@ -34,8 +32,7 @@ class SwapToFinalMapping(TransformationPass):
                     successors = list(dag.successors(node))
                     if len(successors) == 2:
                         if all(isinstance(successors[idx], DAGOutNode) for idx in [0, 1]):
-                            bits = [qreg.index(qubit) for qubit in node.qargs]
-                            qmap[bits[0]], qmap[bits[1]] = qmap[bits[1]], qmap[bits[0]]
+                            qmap.swap(node.qargs[0], node.qargs[1])
                             dag.remove_op_node(node)
                             permuted = True
 

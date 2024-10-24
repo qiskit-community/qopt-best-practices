@@ -35,7 +35,7 @@ class TestSwapCancellation(TestCase):
         swap_pass.property_set["virtual_permutation_layout"] = layout
 
         dag = circuit_to_dag(qc)
-        qc2 = dag_to_circuit(swap_pass.run(dag))
+        _ = swap_pass.run(dag)
 
         new_layout = swap_pass.property_set["virtual_permutation_layout"]
 

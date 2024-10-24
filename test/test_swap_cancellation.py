@@ -4,7 +4,7 @@
 from unittest import TestCase
 
 from qiskit import QuantumCircuit
-from qiskit.converters import circuit_to_dag, dag_to_circuit
+from qiskit.converters import circuit_to_dag
 from qiskit.transpiler import Layout
 
 from qopt_best_practices.transpilation.swap_cancellation_pass import SwapToFinalMapping

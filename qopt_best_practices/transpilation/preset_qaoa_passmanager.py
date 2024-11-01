@@ -24,6 +24,7 @@ def qaoa_swap_strategy_pm(config: Dict[str, Any]):
     swap_strategy = config.get("swap_strategy", None)
     edge_coloring = config.get("edge_coloring", None)
     basis_gates = config.get("basis_gates", ["sx", "x", "rz", "cx", "id"])
+    construct_qaoa = config.get("construct_qaoa", True)
 
     if swap_strategy is None:
         raise ValueError("No swap_strategy provided in config.")
@@ -32,19 +33,19 @@ def qaoa_swap_strategy_pm(config: Dict[str, Any]):
         raise ValueError("No edge_coloring provided in config.")
 
     # 2. define pass manager for cost layer
-    qaoa_pm = PassManager(
-        [
-            HighLevelSynthesis(basis_gates=["PauliEvolution"]),
-            FindCommutingPauliEvolutions(),
-            Commuting2qGateRouter(
-                swap_strategy,
-                edge_coloring,
-            ),
-            SwapToFinalMapping(),
-            HighLevelSynthesis(basis_gates=basis_gates),
-            InverseCancellation(gates_to_cancel=[CXGate()]),
-            QAOAConstructionPass(num_layers),
-        ]
-    )
+    qaoa_passes = [
+        HighLevelSynthesis(basis_gates=["PauliEvolution"]),
+        FindCommutingPauliEvolutions(),
+        Commuting2qGateRouter(
+            swap_strategy,
+            edge_coloring,
+        ),
+        SwapToFinalMapping(),
+        HighLevelSynthesis(basis_gates=basis_gates),
+        InverseCancellation(gates_to_cancel=[CXGate()]),
+    ]
 
-    return qaoa_pm
+    if construct_qaoa:
+        qaoa_passes.append(QAOAConstructionPass(num_layers))
+
+    return PassManager(qaoa_passes)

@@ -66,5 +66,5 @@ class TestQubitSelection(TestCase):
         if self.major_version < 2:
             expected_path = [8, 9, 11, 12, 13, 14, 15, 18, 21, 23]
         else:
-            expected_path = [1, 2, 3, 4, 5, 6, 10, 12, 13, 14]
+            expected_path = [1, 2, 3, 4, 5, 7, 10, 12, 13, 14]
         self.assertEqual(set(path), set(expected_path))

@@ -1,6 +1,5 @@
 """Test the construction of the QAOA ansatz."""
 
-
 from unittest import TestCase
 
 from qiskit import QuantumCircuit, transpile

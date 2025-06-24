@@ -1,6 +1,9 @@
 """QAOA Cost function utils"""
 
+from collections import defaultdict
+import networkx as nx
 import numpy as np
+
 from qiskit.quantum_info import SparsePauliOp
 
 _PARITY = np.array([-1 if bin(i).count("1") % 2 else 1 for i in range(256)], dtype=np.complex128)
@@ -29,3 +32,20 @@ def qaoa_sampler_cost_fun(params, ansatz, hamiltonian, sampler):
     result = sum(probability * value for probability, value in evaluated.values())
 
     return result
+
+
+def counts_to_maxcut_cost(graph: nx.Graph, counts: dict):
+    """Convert a dict of counts to a dict of cut values for MaxCut.
+    
+    This method computes the cost function x^T Q x.
+    """
+    nshots = sum(counts.values())
+    adj_mat = nx.adjacency_matrix(graph, nodelist=range(graph.order())).toarray()
+    cost_vals = defaultdict(float)
+
+    for bit_str, count in counts.items():
+        x = np.array([int(x) for x in bit_str[::-1]])
+        val = float(x.T @ adj_mat @ (1-x))
+        cost_vals[val] += count / nshots
+
+    return cost_vals

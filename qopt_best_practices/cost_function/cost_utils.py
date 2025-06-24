@@ -36,7 +36,7 @@ def qaoa_sampler_cost_fun(params, ansatz, hamiltonian, sampler):
 
 def counts_to_maxcut_cost(graph: nx.Graph, counts: dict):
     """Convert a dict of counts to a dict of cut values for MaxCut.
-    
+
     This method computes the cost function x^T Q x.
     """
     nshots = sum(counts.values())
@@ -45,7 +45,7 @@ def counts_to_maxcut_cost(graph: nx.Graph, counts: dict):
 
     for bit_str, count in counts.items():
         x = np.array([int(x) for x in bit_str[::-1]])
-        val = float(x.T @ adj_mat @ (1-x))
+        val = float(x.T @ adj_mat @ (1 - x))
         cost_vals[val] += count / nshots
 
     return cost_vals

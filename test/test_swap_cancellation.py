@@ -1,6 +1,5 @@
 """The the cancellation of unneeded SWAP gates."""
 
-
 from unittest import TestCase
 
 from qiskit import QuantumCircuit

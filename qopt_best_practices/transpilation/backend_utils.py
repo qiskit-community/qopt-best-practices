@@ -5,7 +5,7 @@ from qiskit.transpiler import Target
 
 def remove_instruction_from_target(target: Target, gate_name: str) -> Target:
     """Create a new target without the specified instruction.
-    
+
     Args:
         target: The target to copy and remove the specified instruction.
         gate_name: The name of the instruction to remove.

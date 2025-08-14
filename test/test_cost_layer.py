@@ -33,6 +33,6 @@ class TestCostLayer(TestCase):
 
         cost_layer = get_cost_layer(cost_op)
 
-        self.assertTrue(len( cost_layer.parameters), 3)
+        self.assertTrue(len(cost_layer.parameters), 3)
         for name in ["c1", "c2", "γ[0]"]:
             self.assertTrue(name in [param.name for param in cost_layer.parameters])

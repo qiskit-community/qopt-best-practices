@@ -30,9 +30,7 @@ def qaoa_swap_strategy_pm(config: Dict[str, Any]):
 
     valid_prep = ["default", "pauli_evolution"]
     if cost_layer_preparation not in valid_prep:
-        raise ValueError(
-            f"Invalid cost_layer_preparation. Exepected element of {valid_prep}."
-        )
+        raise ValueError(f"Invalid cost_layer_preparation. Exepected element of {valid_prep}.")
 
     if swap_strategy is None:
         raise ValueError("No swap_strategy provided in config.")

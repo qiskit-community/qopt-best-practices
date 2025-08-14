@@ -33,7 +33,7 @@ runs:
         PYTHONWARNINGS: default
       run: |
         # run slow tests only on scheduled event or if input flag is set
-        if [ "${{ inputs.os }}" == "ubuntu-latest" ] && [ "${{ inputs.python-version }}" == "3.8" ]; then
+        if [ "${{ inputs.os }}" == "ubuntu-latest" ] && [ "${{ inputs.python-version }}" == "3.9" ]; then
           export PYTHON="coverage3 run --source qopt_best_practices --parallel-mode"
         fi
         stestr --test-path test run 2> >(tee /dev/stderr out.txt > /dev/null)

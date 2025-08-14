@@ -33,7 +33,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.8]
+        python-version: [3.9]
     steps:
       - name: Print Concurrency Group
         env:
@@ -75,14 +75,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.8, 3.11]
+        python-version: [3.9, 3.11]
         include:
           - os: macos-latest
-            python-version: 3.8
+            python-version: 3.9
           - os: macos-latest
             python-version: 3.11
           - os: windows-latest
-            python-version: 3.8
+            python-version: 3.9
           - os: windows-latest
             python-version: 3.11
     steps:
@@ -117,7 +117,7 @@ jobs:
           mkdir ./ci-artifact-data
           coverage3 combine
           mv .coverage ./ci-artifact-data/qopt.dat
-        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == 3.8 }}
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == 3.9 }}
         shell: bash
       - uses: actions/upload-artifact@v4
         with:

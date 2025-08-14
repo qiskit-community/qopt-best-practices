@@ -40,10 +40,11 @@ def qaoa_swap_strategy_pm(config: Dict[str, Any]):
     if edge_coloring is None:
         raise ValueError("No edge_coloring provided in config.")
 
+    qaoa_passes = []
     if cost_layer_preparation == "default":
-        qaoa_passes = [PrepareCostLayer()]
+        qaoa_passes.append(PrepareCostLayer())
     elif cost_layer_preparation == "pauli_evolution":
-        qaoa_passes = [
+        qaoa_passes += [
             HighLevelSynthesis(basis_gates=["PauliEvolution"]),
             FindCommutingPauliEvolutions(),
         ]

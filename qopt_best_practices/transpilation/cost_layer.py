@@ -4,9 +4,10 @@ from qiskit import QuantumCircuit
 from qiskit.circuit.library import qaoa_ansatz
 from qiskit.quantum_info import SparsePauliOp
 
+
 def get_cost_layer(cost_operator: SparsePauliOp):
     """Return the exponential of the cost operator only.
-    
+
     Note: The cost_operator is allowed to contain parameters.
     """
 
@@ -17,9 +18,9 @@ def get_cost_layer(cost_operator: SparsePauliOp):
     dummy_mixer_op = SparsePauliOp.from_sparse_list([("I", [i], 1) for i in range(nqb)], nqb)
 
     cost_layer = qaoa_ansatz(
-        cost_operator, 
-        reps=1, 
-        initial_state=init_state, 
+        cost_operator,
+        reps=1,
+        initial_state=init_state,
         mixer_operator=dummy_mixer_op,
     )
 

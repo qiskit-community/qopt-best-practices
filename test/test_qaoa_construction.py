@@ -4,19 +4,19 @@ from unittest import TestCase
 
 from qiskit import QuantumCircuit, transpile
 from qiskit.circuit import Parameter
-from qiskit.circuit.library import QAOAAnsatz
+from qiskit.circuit.library import qaoa_ansatz
 from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import PassManager
-from qiskit.transpiler.passes import HighLevelSynthesis
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
     SwapStrategy,
-    FindCommutingPauliEvolutions,
     Commuting2qGateRouter,
 )
 
-from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
+from qopt_best_practices.transpilation.cost_layer import get_cost_layer
+from qopt_best_practices.transpilation.prepare_cost_layer import PrepareCostLayer
 from qopt_best_practices.transpilation.preset_qaoa_passmanager import qaoa_swap_strategy_pm
+from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
 from qopt_best_practices.transpilation.swap_cancellation_pass import SwapToFinalMapping
 
 
@@ -48,9 +48,7 @@ class TestQAOAConstruction(TestCase):
         """Compare the pass with the SWAPs and ensure the measurements are ordered properly."""
         qaoa_pm = qaoa_swap_strategy_pm(self.config)
 
-        cost_op_circ = QAOAAnsatz(
-            self.cost_op, initial_state=QuantumCircuit(4), mixer_operator=QuantumCircuit(4)
-        ).decompose(reps=1)
+        cost_op_circ = get_cost_layer(self.cost_op)
 
         ansatz = qaoa_pm.run(cost_op_circ)
 
@@ -72,7 +70,7 @@ class TestQAOAConstruction(TestCase):
         permuted_cost_op = SparsePauliOp.from_list([("IIZZ", 1), ("ZZII", 1), ("IZZI", 1)])
         value = self.estimator.run([(ansatz, permuted_cost_op, [1, 2])]).result()[0].data.evs
 
-        library_ansatz = QAOAAnsatz(self.cost_op, reps=1)
+        library_ansatz = qaoa_ansatz(self.cost_op, reps=1)
         library_ansatz = transpile(library_ansatz, basis_gates=["cx", "rz", "rx", "h"])
 
         expected = self.estimator.run([(library_ansatz, self.cost_op, [1, 2])]).result()[0].data.evs
@@ -92,7 +90,7 @@ class TestQAOAConstruction(TestCase):
 
         value = self.estimator.run([(ansatz, self.cost_op, [1, 2, 3, 4])]).result()[0].data.evs
 
-        library_ansatz = QAOAAnsatz(self.cost_op, reps=2)
+        library_ansatz = qaoa_ansatz(self.cost_op, reps=2)
         library_ansatz = transpile(library_ansatz, basis_gates=["cx", "rz", "rx", "h"])
 
         expected = (
@@ -107,15 +105,12 @@ class TestQAOAConstruction(TestCase):
             [("IIIIZZ", 1), ("IIZZII", 1), ("ZZIIII", 1), ("IIZIIZ", 1)],
         )
 
-        ansatz = QAOAAnsatz(
-            cost_op, reps=1, initial_state=QuantumCircuit(6), mixer_operator=QuantumCircuit(6)
-        )
+        ansatz = get_cost_layer(cost_op)
 
         # Test with the SWAP removal
         qaoa_pm = PassManager(
             [
-                HighLevelSynthesis(basis_gates=["PauliEvolution"]),
-                FindCommutingPauliEvolutions(),
+                PrepareCostLayer(),
                 Commuting2qGateRouter(SwapStrategy.from_line(range(6))),
                 SwapToFinalMapping(),
             ]
@@ -126,8 +121,7 @@ class TestQAOAConstruction(TestCase):
         # Test without the SWAP removal
         qaoa_pm = PassManager(
             [
-                HighLevelSynthesis(basis_gates=["PauliEvolution"]),
-                FindCommutingPauliEvolutions(),
+                PrepareCostLayer(),
                 Commuting2qGateRouter(SwapStrategy.from_line(range(6))),
             ]
         )

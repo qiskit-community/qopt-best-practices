@@ -40,6 +40,18 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.commuting_2q_blo
     Commuting2qBlock,
 )
 
+from collections import defaultdict
+
+from qiskit.circuit import Gate, QuantumCircuit, Qubit
+from qiskit.converters import circuit_to_dag
+from qiskit.dagcircuit import DAGCircuit, DAGOpNode
+from qiskit.transpiler.basepasses import TransformationPass
+from qiskit.transpiler.exceptions import TranspilerError
+from qiskit.transpiler.layout import Layout
+from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.swap_strategy import SwapStrategy
+from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.commuting_2q_block import (
+    Commuting2qBlock,
+)
 
 
 if typing.TYPE_CHECKING:
@@ -317,7 +329,7 @@ def annotated_qaoa_ansatz(
     )
 
 from qiskit.converters import dag_to_circuit, circuit_to_dag
-class PrepareCostLayer(TransformationPass):
+class AnnotatedPrepareCostLayer(TransformationPass):
     """Prepares the cost layer for the `Commuting2qGateRouter`.
 
     The cost layer may have single qubit gates, two qubit gates, and more.
@@ -363,23 +375,7 @@ class PrepareCostLayer(TransformationPass):
                     box_dag = circuit_to_dag(node.op.params[0])
                     dag.substitute_node_with_dag(node, box_dag)
 
-
-
-from collections import defaultdict
-
-from qiskit.circuit import Gate, QuantumCircuit, Qubit
-from qiskit.converters import circuit_to_dag
-from qiskit.dagcircuit import DAGCircuit, DAGOpNode
-from qiskit.transpiler.basepasses import TransformationPass
-from qiskit.transpiler.exceptions import TranspilerError
-from qiskit.transpiler.layout import Layout
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.swap_strategy import SwapStrategy
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.commuting_2q_block import (
-    Commuting2qBlock,
-)
-
-
-class Commuting2qGateRouter(TransformationPass):
+class AnnotatedCommuting2qGateRouter(TransformationPass):
     """A class to swap route one or more commuting gates to the coupling map.
 
     This pass routes blocks of commuting two-qubit gates encapsulated as
@@ -775,8 +771,8 @@ if __name__ == "__main__":
 
     pre_init = PassManager(
     [
-        PrepareCostLayer(),
-        Commuting2qGateRouter(swap_strategy, edge_coloring),
+        AnnotatedPrepareCostLayer(),
+        AnnotatedCommuting2qGateRouter(swap_strategy, edge_coloring),
         # SwapToFinalMapping(),  # Removes unnecessary SWAP gates that the end of the block
         # HighLevelSynthesis(basis_gates=["x", "cx", "sx", "rz", "id"]),
         # InverseCancellation(gates_to_cancel=[CXGate()]),

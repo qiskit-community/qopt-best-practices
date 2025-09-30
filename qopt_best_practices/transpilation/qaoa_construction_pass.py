@@ -1,6 +1,7 @@
 """A pass to build a full QAOA ansatz circuit."""
 
 from typing import Optional
+import warnings
 
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.circuit import QuantumCircuit, ParameterVector, Parameter
@@ -116,7 +117,7 @@ class QAOAConstructionPass(TransformationPass):
                 ):
                     qaoa_circuit.measure(qidx, cidx)
             else:
-                print("layout not found, assigining trivial layout")
+                warnings.warn("Layout not found, assigining trivial layout")
                 for idx in range(num_qubits):
                     qaoa_circuit.measure(idx, idx)
         else:

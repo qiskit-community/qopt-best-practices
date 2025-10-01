@@ -12,7 +12,6 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
 )
 from qiskit.circuit.library import CXGate
 from qiskit.transpiler.passes import HighLevelSynthesis, InverseCancellation
-from qiskit_optimization.applications import Maxcut
 from qiskit.providers.fake_provider import GenericBackendV2
 
 from qopt_best_practices.circuit_library import annotated_qaoa_ansatz
@@ -45,9 +44,8 @@ def get_problem_maxcut(n=4, elist=None):
     graph = nx.Graph()
     graph.add_nodes_from(range(n))
     graph.add_weighted_edges_from(elist)
-    max_cut = Maxcut(graph)
-    qubo = max_cut.to_quadratic_program()
-    cost_operator, _ = qubo.to_ising()
+    local_correlators = build_max_cut_paulis(graph)
+    cost_operator = SparsePauliOp.from_list(local_correlators)
     cost_layer = get_cost_layer(cost_operator)
     return cost_operator, cost_layer, graph
 

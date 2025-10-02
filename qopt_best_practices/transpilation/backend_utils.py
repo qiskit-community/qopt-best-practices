@@ -29,6 +29,8 @@ def remove_instruction_from_target(target: Target, gate_name: str) -> Target:
             continue  # Skip the gate you want to remove
 
         instruction = target.operation_from_name(name)
+        if qarg_map == {None: None}:
+            qarg_map = None
         new_target.add_instruction(instruction, qarg_map, name=name)
 
     return new_target

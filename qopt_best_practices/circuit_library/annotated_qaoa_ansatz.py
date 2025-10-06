@@ -30,7 +30,7 @@ class CostLayerAnnotation(annotation.Annotation):
 
 
 class MixerAnnotation(annotation.Annotation):
-    """Annotation for mixer boxes. The payload indicates the layer id,
+    """Annotation for mixer boxes. The payload indicates the QAOA layer id,
     which is expected to start counting at 1! (not 0)"""
 
     def __init__(self, layer_id: int):

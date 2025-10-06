@@ -294,6 +294,23 @@ class TestAnnotatedTranspilation(unittest.TestCase):
             hamiltonian, cost_layer, mixer_op, 1, backend, initial_layout, optimized=False
         )
 
+    def test_standard_two_local_mixer(self):
+        """Run comparison against standard pipeline with custom
+        mixer with 2-local gates."""
+        hamiltonian = SparsePauliOp.from_list([("IZZ", 1), ("ZIZ", 2), ("ZZI", 3)])
+        cost_layer = get_cost_layer(hamiltonian)
+        backend, initial_layout = backend_and_layout_a(cost_layer)
+        mixer_op = SparsePauliOp.from_list([("IXX", 1), ("XIX", 2), ("XXI", 3)])
+
+        param_values = [5.11350346] * 3 + [5.52673212] * 3
+        standard_transpiled, annot_transpiled = self._run_standard_and_annot(
+            cost_layer, hamiltonian, mixer_op, 3, backend, initial_layout, optimized=False
+        )
+        eval_standard = self._estimate(standard_transpiled, hamiltonian, param_values)
+        eval_annot = self._estimate(annot_transpiled, hamiltonian, param_values)
+
+        self.assertAlmostEqual(float(eval_standard[0]), float(eval_annot[0]), places=12)
+
 
 if __name__ == "__main__":
     unittest.main()

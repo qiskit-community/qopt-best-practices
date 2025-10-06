@@ -436,11 +436,13 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                     new_dag = box_dag.copy_empty_like()
                     inverse_layout = qmap.get_physical_bits()
                     for box_node in box_dag.op_nodes():
-                        original_index = box_node.qargs[0]
-                        new_index = inverse_layout[original_index._index]
-                        new_dag.apply_operation_back(
-                            box_node.op, qargs=[new_dag.qubits[new_index._index]]
-                        )
+                        new_qargs = []
+                        for qubit in box_node.qargs:
+                            physical_index = inverse_layout[qubit._index]
+                            new_qargs.append(new_dag.qubits[physical_index._index])
+
+                        new_dag.apply_operation_back(box_node.op, qargs=new_qargs)
+
                     node.op.params[0] = dag_to_circuit(new_dag)
 
         # Add final measurements

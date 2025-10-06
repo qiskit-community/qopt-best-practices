@@ -480,7 +480,7 @@ class SynthesizeAndSimplifyCostLayer(TransformationPass):
             gate_names.update(target.operation_names)
         two_qubit_gates = []
         for name in gate_names:
-            gate = get_standard_gate_name_mapping.get(name)
+            gate = get_standard_gate_name_mapping()[name]
             if gate is not None and getattr(gate, "num_qubits", None) == 2:
                 two_qubit_gates.append(gate)
 

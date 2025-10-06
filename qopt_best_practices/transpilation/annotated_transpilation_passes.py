@@ -402,7 +402,6 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
 
             box_circuit = node.op.params[0]
             box_dag = circuit_to_dag(box_circuit)
-
             if "cost_layer" in layer_name:
                 if layer_index == 1:
                     # Remove final SWAPs and update virtual layout
@@ -419,7 +418,6 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                             break
                     permuted_cost_layer = box_dag
                     node.op.params[0] = dag_to_circuit(permuted_cost_layer)
-                    # dag.substitute_node_with_dag(node, permuted_cost_layer)
                 elif permuted_cost_layer:
                     final_params = list(box_circuit.parameters)
                     new_circuit = dag_to_circuit(permuted_cost_layer).assign_parameters(
@@ -429,11 +427,21 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                         new_circuit.reverse_ops() if layer_index % 2 == 0 else new_circuit
                     )
                     node.op.params[0] = dag_to_circuit(new_dag)
-                    # dag.substitute_node_with_dag(node, new_dag)
                 else:
                     raise TypeError("Missing permuted cost layer for substitution.")
-            # else:
-            #     dag.substitute_node_with_dag(node, box_dag)
+
+            elif "mixer" in layer_name:
+                if layer_index % 2 == 1:
+                    # Permute mixer layer according to virtual permutation layout
+                    new_dag = box_dag.copy_empty_like()
+                    inverse_layout = qmap.get_physical_bits()
+                    for box_node in box_dag.op_nodes():
+                        original_index = box_node.qargs[0]
+                        new_index = inverse_layout[original_index._index]
+                        new_dag.apply_operation_back(
+                            box_node.op, qargs=[new_dag.qubits[new_index._index]]
+                        )
+                    node.op.params[0] = dag_to_circuit(new_dag)
 
         # Add final measurements
         for cidx in range(dag.num_qubits()):

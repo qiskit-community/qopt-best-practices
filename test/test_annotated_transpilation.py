@@ -158,21 +158,30 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         return qopt_transpiled, annot_transpiled
 
     def _run_standard_and_annot(  # pylint: disable=too-many-positional-arguments
-        self, cost_layer, hamiltonian, num_qaoa_layers, backend, initial_layout, optimized=False
+        self,
+        cost_layer,
+        hamiltonian,
+        mixer_op,
+        num_qaoa_layers,
+        backend,
+        initial_layout,
+        optimized=False,
     ):
         """Run both the standard qaoa and new annotated pipeline"""
 
         swap_strategy, edge_coloring = self._get_swap_strategy(cost_layer)
 
         # Standard pipeline
-        standard_ansatz = qaoa_ansatz(hamiltonian, reps=num_qaoa_layers)
+        standard_ansatz = qaoa_ansatz(hamiltonian, reps=num_qaoa_layers, mixer_operator=mixer_op)
         standard_pm = generate_preset_pass_manager(
             backend=backend, optimization_level=3, initial_layout=initial_layout
         )
         standard_transpiled = standard_pm.run(standard_ansatz)
 
         # Annotated pipeline
-        annotated_ansatz = annotated_qaoa_ansatz(hamiltonian, reps=num_qaoa_layers)
+        annotated_ansatz = annotated_qaoa_ansatz(
+            hamiltonian, reps=num_qaoa_layers, mixer_operator=mixer_op
+        )
         annot_passes = [
             AnnotatedPrepareCostLayer(),
             AnnotatedCommuting2qGateRouter(swap_strategy, edge_coloring),
@@ -207,14 +216,21 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         self._assert_equivalence(eval_annot, eval_qopt, annot_transpiled, qopt_transpiled)
 
     def _run_comparison_standard(  # pylint: disable=too-many-positional-arguments
-        self, hamiltonian, cost_layer, num_qaoa_layers, backend, initial_layout, optimized=False
+        self,
+        hamiltonian,
+        cost_layer,
+        mixer_op,
+        num_qaoa_layers,
+        backend,
+        initial_layout,
+        optimized=False,
     ):
         """Run both transpilation pipelines and compare expectation values
         and number of final operations"""
 
         param_values = [5.11350346] * num_qaoa_layers + [5.52673212] * num_qaoa_layers
         standard_transpiled, annot_transpiled = self._run_standard_and_annot(
-            cost_layer, hamiltonian, num_qaoa_layers, backend, initial_layout, optimized
+            cost_layer, hamiltonian, mixer_op, num_qaoa_layers, backend, initial_layout, optimized
         )
         eval_standard = self._estimate(standard_transpiled, hamiltonian, param_values)
         eval_annot = self._estimate(annot_transpiled, hamiltonian, param_values)
@@ -264,7 +280,18 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         backend, initial_layout = backend_and_layout_a(cost_layer)
 
         self._run_comparison_standard(
-            hamiltonian, cost_layer, 1, backend, initial_layout, optimized=False
+            hamiltonian, cost_layer, None, 1, backend, initial_layout, optimized=False
+        )
+
+    def test_standard_mixer(self):
+        """Run comparison against standard pipeline with custom mixer."""
+        hamiltonian = SparsePauliOp.from_list([("IZZ", 1), ("ZIZ", 2), ("ZZI", 3)])
+        cost_layer = get_cost_layer(hamiltonian)
+        backend, initial_layout = backend_and_layout_a(cost_layer)
+        mixer_op = SparsePauliOp.from_list([("IIX", 1), ("IXI", 2), ("XII", 3)])
+
+        self._run_comparison_standard(
+            hamiltonian, cost_layer, mixer_op, 1, backend, initial_layout, optimized=False
         )
 
 

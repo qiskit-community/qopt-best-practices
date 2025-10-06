@@ -1,7 +1,8 @@
+"""Annotated QAOA Ansatz builder"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
-
 import typing
 import warnings
 import itertools
@@ -9,9 +10,7 @@ import numpy as np
 
 from qiskit.circuit.library.pauli_evolution import PauliEvolutionGate
 from qiskit.circuit.parametervector import ParameterVector
-from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit.quantum_info import Operator, Pauli, SparsePauliOp
-from qiskit.quantum_info.operators.base_operator import BaseOperator
 from qiskit.quantum_info.operators.base_operator import BaseOperator
 
 from qiskit.circuit import annotation, QuantumCircuit
@@ -39,15 +38,15 @@ class MixerAnnotation(annotation.Annotation):
 
 
 class InitStateAnnotation(annotation.Annotation):
-    """Annotation for initial state boxes. The payload indicates the layer id,
-    which is expected to start counting at 1! (not 0)"""
+    """Annotation for initial state boxes. This annotation automatically sets
+    the QAOA layer id as there should only be one initial state per QAOA circuit."""
 
-    def __init__(self, layer_id: int):
+    def __init__(self):
         self.namespace = "qaoa.init_state"
-        self.payload = str(layer_id)
+        self.payload = str(1)
 
 
-def annotated_evolved_operator_ansatz(
+def annotated_evolved_operator_ansatz(  # pylint: disable=too-many-positional-arguments
     operators: BaseOperator | Sequence[BaseOperator],
     reps: int = 1,
     evolution: EvolutionSynthesis | None = None,
@@ -101,7 +100,9 @@ def annotated_evolved_operator_ansatz(
             layers of gate objects. Setting this to ``False`` is significantly less performant,
             especially for parameter binding, but can be desirable for a cleaner visualization.
         annotations: A series of box annotations. For qaoa circuits, the expected order of annotations is
-            alternating cost and mixer on a per-layer basis:
+            alternating cost and mixer on a per-layer basis, with a total of
+            ``reps * len(operators)`` elements:
+
             ```
                 annotations = [CostLayerAnnotation(layer_id=1),
                                 MixerAnnotation(layer_id=1),
@@ -220,7 +221,7 @@ def _remove_identities(operators, prefixes):
     return cleaned_ops, cleaned_prefix
 
 
-def annotated_qaoa_ansatz(
+def annotated_qaoa_ansatz(  # pylint: disable=too-many-positional-arguments
     cost_operator: BaseOperator,
     reps: int = 1,
     initial_state: QuantumCircuit | None = None,
@@ -273,7 +274,7 @@ def annotated_qaoa_ansatz(
     num_qubits = cost_operator.num_qubits
 
     circuit = QuantumCircuit(num_qubits)
-    with circuit.box(annotations=(InitStateAnnotation(layer_id=1),)):
+    with circuit.box(annotations=(InitStateAnnotation(),)):
         if initial_state is None:
             initial_state = QuantumCircuit(num_qubits)
             initial_state.h(range(num_qubits))

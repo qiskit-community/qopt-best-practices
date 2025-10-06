@@ -1,3 +1,5 @@
+"""Annotated QAOA transpilation passes"""
+
 from __future__ import annotations
 from collections import defaultdict
 
@@ -11,20 +13,12 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.commuting_2q_blo
 )
 from qiskit.circuit import Gate, Qubit
 from qiskit.circuit.library.standard_gates import get_standard_gate_name_mapping
-from qiskit.converters import circuit_to_dag
-from qiskit.dagcircuit import DAGCircuit, DAGOpNode
-from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.transpiler.exceptions import TranspilerError
 from qiskit.transpiler.layout import Layout
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.swap_strategy import SwapStrategy
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.commuting_2q_block import (
-    Commuting2qBlock,
-)
 from qiskit.transpiler.passes import HighLevelSynthesis, InverseCancellation
-from qiskit.dagcircuit import DAGOutNode, DAGCircuit, DAGInNode
-from qiskit.transpiler import TransformationPass
+from qiskit.dagcircuit import DAGOutNode, DAGCircuit, DAGOpNode
 from qiskit.circuit import ClassicalRegister
-from qiskit.circuit.library import SwapGate, Measure, CXGate
+from qiskit.circuit.library import SwapGate, Measure
 from qiskit.converters import dag_to_circuit, circuit_to_dag
 
 
@@ -469,29 +463,26 @@ class UnrollBoxes(TransformationPass):
 
 
 class SynthesizeAndSimplifyCostLayer(TransformationPass):
-    """Decompose Cost Layer using HLS, apply commutative cancelation."""
+    """Decompose cost layer using HLS (High Level Synthesis), apply inverse cancelation."""
 
     requires = []
     preserves = []
 
     def __init__(self, target=None, basis_gates=None):
 
-        # Determine available gates
+        super().__init__()
+
+        # Unify behavior for target and basis gates inputs
         gate_names = set()
         if basis_gates:
             gate_names.update(basis_gates)
         elif target:
             gate_names.update(target.operation_names)
-
-        # Filter for 2-qubit gates
         two_qubit_gates = []
         for name in gate_names:
-            try:
-                gate = get_standard_gate_name_mapping.get(name)
-                if gate.num_qubits == 2:
-                    two_qubit_gates.append(gate)
-            except Exception:
-                continue
+            gate = get_standard_gate_name_mapping.get(name)
+            if gate is not None and getattr(gate, "num_qubits", None) == 2:
+                two_qubit_gates.append(gate)
 
         self.hls = HighLevelSynthesis(target=target, basis_gates=basis_gates)
         self.inverse_cancel = InverseCancellation(gates_to_cancel=two_qubit_gates)

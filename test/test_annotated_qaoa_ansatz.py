@@ -1,12 +1,18 @@
+"""Unit tests for the annotated qaoa ansatz function."""
+
 import unittest
+from networkx import barabasi_albert_graph
+
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
+
 from qopt_best_practices.utils import build_max_cut_paulis
-from networkx import barabasi_albert_graph
 from qopt_best_practices.circuit_library import annotated_qaoa_ansatz
 
 
 class TestAnnotatedQAOAAnsatz(unittest.TestCase):
+    """Testthe annotated qaoa ansatz function."""
+
     def setUp(self):
         graph = barabasi_albert_graph(n=4, m=2, seed=42)
         paulis = build_max_cut_paulis(graph)
@@ -49,7 +55,7 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
             self.assertEqual(instr.operation.name, "box")
             if i < 3:
                 self.assertEqual(instr.operation.annotations[0].payload, "1")
-            elif i >= 3 and i < 5:
+            elif i < 5:
                 self.assertEqual(instr.operation.annotations[0].payload, "2")
             else:
                 self.assertEqual(instr.operation.annotations[0].payload, "3")

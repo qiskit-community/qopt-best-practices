@@ -437,6 +437,10 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                     inverse_layout = qmap.get_physical_bits()
                     for box_node in box_dag.op_nodes():
                         new_qargs = []
+                        if len(box_node.qargs) > 1:
+                            raise NotImplementedError(
+                                "Routing for two-local mixers is not yet supported."
+                            )
                         for qubit in box_node.qargs:
                             physical_index = inverse_layout[qubit._index]
                             new_qargs.append(new_dag.qubits[physical_index._index])

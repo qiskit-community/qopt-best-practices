@@ -65,7 +65,7 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
         """Test ansatz with parameter expressions as cost operator ceofficients.
         Necessary for MOO."""
         c_vec = ParameterVector("c", len(self.hamiltonian))
-        sum_cost_op = sum(c_vec[idx] * hc for idx, hc in enumerate(self.hamiltonian)).simplify()
+        sum_cost_op = sum(c_vec[idx] * hc for idx, hc in enumerate(self.hamiltonian))
         self.assertIsInstance(sum_cost_op.coeffs[0], ParameterExpression)
         circuit = annotated_qaoa_ansatz(sum_cost_op, reps=3)
         self.assertGreaterEqual(len(circuit.data), 7)

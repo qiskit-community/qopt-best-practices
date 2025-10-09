@@ -48,8 +48,6 @@ class AnnotatedPrepareCostLayer(TransformationPass):
                     # In the meantime, let's add them
                     for qreg in dag.qregs.values():
                         box_dag.add_qreg(qreg)
-                    for creg in dag.cregs.values():
-                        box_dag.add_qreg(creg)
 
                     commuting_nodes = []
                     for box_node in box_dag.topological_op_nodes():
@@ -181,6 +179,23 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
                         node.op.params[0] = dag_to_circuit(new_dag)
                     else:
                         node.op.params[0] = dag_to_circuit(new_dag).reverse_ops()
+
+                    # Permute final measurements
+                    measure_nodes = [
+                        node for node in dag.op_nodes() if isinstance(node.op, Measure)
+                    ]
+                    qmap = self.property_set["virtual_permutation_layout"]
+                    if len(measure_nodes) > 0:
+                        for m_node in measure_nodes:
+                            dag.remove_op_node(m_node)
+                        for cidx in range(dag.num_qubits()):
+                            qubit = (
+                                qmap.get_physical_bits().get(cidx, cidx)
+                                if int(node.op.annotations[0].payload) % 2 == 1
+                                else dag.qubits[cidx]
+                            )
+                            dag.apply_operation_back(Measure(), [qubit], [dag.clbits[cidx]])
+
         return dag
 
     def _compose_non_swap_nodes(
@@ -449,15 +464,19 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
 
                     node.op.params[0] = dag_to_circuit(new_dag)
 
-        # Add final measurements
-        for cidx in range(dag.num_qubits()):
-            qubit = (
-                qmap.get_physical_bits().get(cidx, cidx)
-                if num_layers % 2 == 1
-                else dag.qubits[cidx]
-            )
-            dag.apply_operation_back(Measure(), [qubit], [dag.clbits[cidx]])
+        # Permute final measurements
+        measure_nodes = [node for node in dag.op_nodes() if isinstance(node.op, Measure)]
 
+        if len(measure_nodes) > 0:
+            for node in measure_nodes:
+                dag.remove_op_node(node)
+            for cidx in range(dag.num_qubits()):
+                qubit = (
+                    qmap.get_physical_bits().get(cidx, cidx)
+                    if num_layers % 2 == 1
+                    else dag.qubits[cidx]
+                )
+                dag.apply_operation_back(Measure(), [qubit], [dag.clbits[cidx]])
         return dag
 
 

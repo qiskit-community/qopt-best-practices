@@ -138,6 +138,7 @@ class TestAnnotatedTranspilation(unittest.TestCase):
 
         # Annotated pipeline
         annotated_ansatz = annotated_qaoa_ansatz(hamiltonian, reps=num_qaoa_layers)
+        annotated_ansatz.measure_all()
         annot_passes = [
             AnnotatedPrepareCostLayer(),
             AnnotatedCommuting2qGateRouter(swap_strategy, edge_coloring),
@@ -182,6 +183,7 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         annotated_ansatz = annotated_qaoa_ansatz(
             hamiltonian, reps=num_qaoa_layers, mixer_operator=mixer_op
         )
+        annotated_ansatz.measure_all()
         annot_passes = [
             AnnotatedPrepareCostLayer(),
             AnnotatedCommuting2qGateRouter(swap_strategy, edge_coloring),

@@ -8,7 +8,6 @@ import warnings
 import itertools
 import numpy as np
 
-from qiskit.circuit.library.pauli_evolution import PauliEvolutionGate
 from qiskit.circuit.parametervector import ParameterVector
 from qiskit.quantum_info import Operator, Pauli, SparsePauliOp
 from qiskit.quantum_info.operators.base_operator import BaseOperator
@@ -17,6 +16,8 @@ from qiskit.circuit import annotation, QuantumCircuit
 
 if typing.TYPE_CHECKING:
     from qiskit.synthesis.evolution import EvolutionSynthesis
+
+from .pauli_evolution import PauliEvolutionGate
 
 
 class CostLayerAnnotation(annotation.Annotation):

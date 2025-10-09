@@ -4,6 +4,7 @@ import unittest
 from networkx import barabasi_albert_graph
 
 from qiskit import QuantumCircuit
+from qiskit.circuit import ParameterVector, ParameterExpression
 from qiskit.quantum_info import SparsePauliOp
 
 from qopt_best_practices.utils import build_max_cut_paulis
@@ -50,6 +51,23 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
     def test_multiple_layers(self):
         """Test that 3 layers equals 3*2+1=7 boxes."""
         circuit = annotated_qaoa_ansatz(self.hamiltonian, reps=3)
+        self.assertGreaterEqual(len(circuit.data), 7)
+        for i, instr in enumerate(circuit.data):
+            self.assertEqual(instr.operation.name, "box")
+            if i < 3:
+                self.assertEqual(instr.operation.annotations[0].payload, "1")
+            elif i < 5:
+                self.assertEqual(instr.operation.annotations[0].payload, "2")
+            else:
+                self.assertEqual(instr.operation.annotations[0].payload, "3")
+
+    def test_param_expression_coeffs(self):
+        """Test ansatz with parameter expressions as cost operator ceofficients.
+        Necessary for MOO."""
+        c_vec = ParameterVector("c", len(self.hamiltonian))
+        sum_cost_op = sum(c_vec[idx] * hc for idx, hc in enumerate(self.hamiltonian)).simplify()
+        self.assertIsInstance(sum_cost_op.coeffs[0], ParameterExpression)
+        circuit = annotated_qaoa_ansatz(sum_cost_op, reps=3)
         self.assertGreaterEqual(len(circuit.data), 7)
         for i, instr in enumerate(circuit.data):
             self.assertEqual(instr.operation.name, "box")

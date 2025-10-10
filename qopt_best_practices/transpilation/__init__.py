@@ -2,3 +2,10 @@
 
 from .preset_qaoa_passmanager import qaoa_swap_strategy_pm
 from .backend_utils import remove_instruction_from_target
+from .annotated_transpilation_passes import (
+    AnnotatedPrepareCostLayer,
+    AnnotatedCommuting2qGateRouter,
+    AnnotatedSwapToFinalMapping,
+    SynthesizeAndSimplifyCostLayer,
+    UnrollBoxes,
+)

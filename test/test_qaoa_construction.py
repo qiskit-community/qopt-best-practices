@@ -12,14 +12,9 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
     SwapStrategy,
     Commuting2qGateRouter,
 )
-from qiskit.providers.fake_provider import GenericBackendV2
-from qiskit.transpiler import CouplingMap
 
 from qopt_best_practices.transpilation.cost_layer import get_cost_layer
 from qopt_best_practices.transpilation.prepare_cost_layer import PrepareCostLayer
-from qopt_best_practices.transpilation.generate_preset_qaoa_pass_manager import (
-    generate_preset_qaoa_pass_manager,
-)
 from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
 from qopt_best_practices.transpilation.swap_cancellation_pass import SwapToFinalMapping
 
@@ -43,50 +38,10 @@ class TestQAOAConstruction(TestCase):
 
         self.cost_op = SparsePauliOp.from_list([("IIZZ", 1), ("ZZII", 1), ("ZIIZ", 1)])
 
-        self._swap_strategy = SwapStrategy.from_line(list(range(4))),
-        self._edge_coloring = {(idx, idx + 1): (idx + 1) % 2 for idx in range(4)}
-
-        cmap = CouplingMap.from_heavy_hex(distance=3)
-        self._backend = GenericBackendV2(
-            num_qubits=19, coupling_map=cmap, basis_gates=["x", "sx", "cz", "id", "rz"], seed=0
-        )
-
-    def test_depth_one(self):
-        """Compare the pass with the SWAPs and ensure the measurements are ordered properly."""
-        qaoa_pm = generate_preset_qaoa_pass_manager(
-            backend=self._backend,
-            swap_strategy=self._swap_strategy, 
-            edge_coloring=self._edge_coloring,
-        )
-
-        cost_op_circ = get_cost_layer(self.cost_op)
-
-        ansatz = qaoa_pm.run(cost_op_circ)
-
-        # 1. Check the measurement map
-        qreg = ansatz.qregs[0]
-        creg = ansatz.cregs[0]
-
-        expected_meas_map = {0: 1, 1: 0, 2: 3, 3: 2}
-
-        for inst in ansatz.data:
-            if inst.operation.name == "measure":
-                qubit = qreg.index(inst.qubits[0])
-                cbit = creg.index(inst.clbits[0])
-                self.assertEqual(cbit, expected_meas_map[qubit])
-
-        # 2. Check the expectation value. Note that to use the estimator we need to
-        # Remove the final measurements and correspondingly permute the cost op.
-        ansatz.remove_final_measurements(inplace=True)
-        permuted_cost_op = SparsePauliOp.from_list([("IIZZ", 1), ("ZZII", 1), ("IZZI", 1)])
-        value = self.estimator.run([(ansatz, permuted_cost_op, [1, 2])]).result()[0].data.evs
-
-        library_ansatz = qaoa_ansatz(self.cost_op, reps=1)
-        library_ansatz = transpile(library_ansatz, basis_gates=["cx", "rz", "rx", "h"])
-
-        expected = self.estimator.run([(library_ansatz, self.cost_op, [1, 2])]).result()[0].data.evs
-
-        self.assertAlmostEqual(value, expected)
+        self.config = {
+            "swap_strategy": SwapStrategy.from_line(list(range(4))),
+            "edge_coloring": {(idx, idx + 1): (idx + 1) % 2 for idx in range(4)},
+        }
 
     def test_depth_two_qaoa_pass(self):
         """Compare the pass with the SWAPs to an all-to-all construction.

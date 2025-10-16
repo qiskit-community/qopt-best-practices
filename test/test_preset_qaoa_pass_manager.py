@@ -23,13 +23,6 @@ class TestPresetQAOAPassManager(TestCase):
     def setUp(self):
         """Set up re-used variables."""
         self.estimator = StatevectorEstimator()
-        gamma = Parameter("γ")
-        cost_op = QuantumCircuit(4)
-        cost_op.rzz(2 * gamma, 0, 1)
-        cost_op.rzz(2 * gamma, 2, 3)
-        cost_op.swap(0, 1)
-        cost_op.swap(2, 3)
-        cost_op.rzz(2 * gamma, 1, 2)
 
         self.cost_op = SparsePauliOp.from_list([("IIZZ", 1), ("ZZII", 1), ("ZIIZ", 1)])
 

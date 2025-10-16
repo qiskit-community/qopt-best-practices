@@ -49,9 +49,9 @@ def generate_preset_qaoa_pass_manager(
     )
 
     staged_pm = generate_preset_pass_manager(
-        3, 
-        backend, 
-        initial_layout=initial_layout, 
+        3,
+        backend,
+        initial_layout=initial_layout,
     )
 
     staged_pm.pre_init = pre_init

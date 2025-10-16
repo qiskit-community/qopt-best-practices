@@ -174,9 +174,9 @@ class SATMapper:
         """Applies the SAT mapping.
 
         Args:
-            graph: The graph to remap. If a cost operator is provided then it will internally be converted
-                to a graph.
-            swap_strategy (SwapStrategy): The swap strategy to use to find the initial mapping.
+            graph: The graph to remap. If a cost operator is provided then it will
+                internally be converted to a graph.
+            swap_strategy: The swap strategy to use to find the initial mapping.
 
         Returns:
             tuple: A tuple containing the remapped graph, the edge map, and the number of layers of

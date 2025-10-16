@@ -1,6 +1,6 @@
 """Module with transpiler methods for QAOA like circuits."""
 
-from .preset_qaoa_passmanager import qaoa_swap_strategy_pm
+from .generate_preset_qaoa_pass_manager import generate_preset_qaoa_pass_manager
 from .backend_utils import remove_instruction_from_target
 from .annotated_transpilation_passes import (
     AnnotatedPrepareCostLayer,

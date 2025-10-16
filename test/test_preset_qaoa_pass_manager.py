@@ -2,8 +2,6 @@
 
 from unittest import TestCase
 
-from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
 from qiskit.primitives import StatevectorEstimator
 from qiskit.providers.fake_provider import GenericBackendV2
 from qiskit.quantum_info import SparsePauliOp

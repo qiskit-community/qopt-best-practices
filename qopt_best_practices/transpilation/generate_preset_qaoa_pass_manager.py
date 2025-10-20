@@ -1,4 +1,4 @@
-"""Make a pass manager to transpile QAOA."""
+"""Generate a pass manager to transpile QAOA for Qiskit>=2.2."""
 
 from typing import Dict, Tuple
 
@@ -24,9 +24,15 @@ def generate_preset_qaoa_pass_manager(
     edge_coloring: Dict[Tuple[int, int], int] = None,
     initial_layout: Layout = None,
 ):
-    """Provide a pass manager to build the QAOA cirucit.
+    """Provides a pass manager to build the QAOA cirucit.
 
-    This function will be extended in the future.
+    Important note: This pass manager functions with the `annotated_qaoa_ansatz` defined
+    in this package. Crucially, the `annotated_qaoa_ansatz` requires the box functionality
+    which is available for Qiskit>=2.2. Users of older versions of Qiskit are encoraged to
+    upgrade to Qiskit 2.2 or use the non-annotated QAOA transpilation tools that this 
+    packege offer, see the how-to notebook `how_to_apply_optimal_qaoa_transpilation.ipynb`.
+
+    The functionality in this pass manager may be extended in the future.
     """
 
     # 1. define pass manager for annotated qaoa ansatz

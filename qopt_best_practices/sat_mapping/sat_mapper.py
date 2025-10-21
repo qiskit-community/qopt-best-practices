@@ -3,6 +3,7 @@ using the SAT approach from https://arxiv.org/abs/2212.05666.
 """
 
 from __future__ import annotations
+from typing import Union
 
 from dataclasses import dataclass
 from itertools import combinations
@@ -14,6 +15,7 @@ import numpy as np
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
 
+from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
 
@@ -165,13 +167,16 @@ class SATMapper:
         return binary_search_results
 
     def remap_graph_with_sat(
-        self, graph: nx.Graph, swap_strategy
+        self,
+        graph: Union[nx.Graph | SparsePauliOp],
+        swap_strategy: SwapStrategy,
     ) -> tuple[int, dict, list] | tuple[None, None, None]:
         """Applies the SAT mapping.
 
         Args:
-            graph (nx.Graph): The graph to remap.
-            swap_strategy (SwapStrategy): The swap strategy to use to find the initial mapping.
+            graph: The graph to remap. If a cost operator is provided then it will
+                internally be converted to a graph.
+            swap_strategy: The swap strategy to use to find the initial mapping.
 
         Returns:
             tuple: A tuple containing the remapped graph, the edge map, and the number of layers of
@@ -180,13 +185,53 @@ class SATMapper:
             Note the returned edge map `{k: v}` means that node `k` in the original
             graph gets mapped to node `v` in the Pauli strings.
         """
+        op_input = isinstance(graph, SparsePauliOp)
+
+        if op_input:
+            graph = self.op2graph(graph)
+
         num_nodes = len(graph.nodes)
         results = self.find_initial_mappings(graph, swap_strategy, 0, num_nodes - 1)
         solutions = [k for k, v in results.items() if v.satisfiable]
+
         if len(solutions):
             min_k = min(solutions)
             edge_map = dict(results[min_k].mapping)
             remapped_graph = nx.relabel_nodes(graph, edge_map)
+
+            if op_input:
+                return self.graph2op(remapped_graph), edge_map, min_k
+
             return remapped_graph, edge_map, min_k
         else:
             return None, None, None
+
+    @staticmethod
+    def graph2op(graph: nx.Graph) -> SparsePauliOp:
+        """Convert a graph into a sparse Pauli operator."""
+        pauli_list = []
+        for node1, node2, data in graph.edges(data=True):
+            paulis = ["I"] * len(graph)
+            paulis[node1], paulis[node2] = "Z", "Z"
+            weight = data["weight"] if "weight" in data else 1.0
+            pauli_list.append(("".join(paulis)[::-1], weight))
+
+        return SparsePauliOp.from_list(pauli_list)
+
+    @staticmethod
+    def op2graph(operator: SparsePauliOp) -> nx.Graph:
+        """Convert a cost operator to a graph."""
+        graph, edges = nx.Graph(), []
+        for pauli_str, weight in operator.to_list():
+            edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
+
+            if len(edge) == 1:
+                edges.append((edge[0], edge[0], np.real(weight)))
+            elif len(edge) == 2:
+                edges.append((edge[0], edge[1], np.real(weight)))
+            else:
+                raise ValueError(f"The operator {operator} is not Quadratic.")
+
+        graph.add_weighted_edges_from(edges)
+
+        return graph

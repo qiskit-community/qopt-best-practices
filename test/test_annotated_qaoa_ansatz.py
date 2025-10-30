@@ -78,6 +78,30 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
             else:
                 self.assertEqual(instr.operation.annotations[0].payload, "3")
 
+    def test_disconnected_graph(self):
+        """Check that the constructor will fail if the graph is disconnected."""
+
+        cost_op = SparsePauliOp.from_list(
+            [
+                ("IIIIIIIIIIIZIIIIIIIIZIIIIIIIIIIIIIIIIII", (-0.7052117420058351 + 0j)),
+                ("IIIIIIIIIIIZIIIIZIIIIIIIIIIIIIIIIIIIIII", (-0.41310912458730803 + 0j)),
+                ("IIIIIIIIIIIIIIIIZZIIIIIIIIIIIIIIIIIIIII", (-0.13889026348769137 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIZZIIIIIIIII", (-1.2611637053747173 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIZIIZIIIIII", (-0.7849745661237995 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIZIIIIIIIIZ", (0.7613352014865872 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIZZ", (-1.171616190854362 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIZZI", (0.04701291466680199 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIZIIIIIZI", (-0.40542381697372243 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIZZIIIIIIIIIII", (-0.6962346022159056 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIZIIIIIIIIZII", (0.1925567945293817 + 0j)),
+                ("IIIIIIIIIIIIIIIIIIIIIIZZIIIIIIIIIIIIIII", (-0.2766391151103169 + 0j)),
+                ("IIIIIIIIIIIIIZIIIIIIIIZIIIIIIIIIIIIIIII", (-0.010835558499671294 + 0j)),
+            ]
+        )
+
+        with self.assertRaises(NotImplementedError):
+            _ = annotated_qaoa_ansatz(cost_op, reps=2)
+
 
 if __name__ == "__main__":
     unittest.main()

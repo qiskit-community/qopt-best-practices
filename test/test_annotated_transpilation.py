@@ -309,6 +309,32 @@ class TestAnnotatedTranspilation(unittest.TestCase):
                 cost_layer, hamiltonian, mixer_op, 3, backend, initial_layout, optimized=False
             )
 
+    def test_cost_op_single_rz(self):
+        """Check that RZ gate collection works as expected in AnnotatedPrepareCostLayer pass."""
+
+        graph = barabasi_albert_graph(n=10, m=3, seed=42)
+        local_correlators = build_max_cut_paulis(graph)
+        local_correlators += [
+            ("IIIIIIIIIZ", 1.0),
+            ("IIIIIIIIZI", 1.0),
+            ("IIIIIIIZII", 1.0),
+            ("ZIIIIIIIII", 1.0),
+        ]
+        cost_operator = SparsePauliOp.from_list(local_correlators)
+
+        ansatz = annotated_qaoa_ansatz(cost_operator, reps=2)
+        ansatz.measure_all()
+
+        pm = PassManager([AnnotatedPrepareCostLayer()])
+
+        out = pm.run(ansatz)
+
+        for inst in out:
+            if inst.operation.name == "box":
+                if "cost_layer" in inst.operation.annotations[0].namespace:
+                    box_circ = inst.operation.params[0]
+                    self.assertEqual(box_circ.count_ops(), {"rz": 4, "commuting_2q_block": 1})
+
 
 if __name__ == "__main__":
     unittest.main()

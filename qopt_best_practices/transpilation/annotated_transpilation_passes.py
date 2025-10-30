@@ -50,15 +50,18 @@ class AnnotatedPrepareCostLayer(TransformationPass):
                         box_dag.add_qreg(qreg)
 
                     commuting_nodes = []
+                    rz_gates = []
                     for box_node in box_dag.topological_op_nodes():
-                        if box_node.op.name not in ["rz", "rzz"]:
+                        if box_node.op.name == "rzz":
+                            commuting_nodes.append(box_node)
+                        elif box_node.op.name == "rz":
+                            rz_gates.append(box_node)
+                            box_dag.remove_op_node(box_node)
+                        else:
                             raise ValueError(
                                 f"{self.__class__.__name__} only supports rz and rzz nodes. "
                                 f"Found {box_node.op.name} instead."
                             )
-
-                        if box_node.op.name == "rzz":
-                            commuting_nodes.append(box_node)
 
                     commuting_block = Commuting2qBlock(commuting_nodes)
 
@@ -69,6 +72,12 @@ class AnnotatedPrepareCostLayer(TransformationPass):
                     }
 
                     box_dag.replace_block_with_op(commuting_nodes, commuting_block, wire_order)
+
+                    for z_node in rz_gates:
+                        box_dag.apply_operation_back(
+                            z_node.op, qargs=z_node.qargs, cargs=z_node.cargs
+                        )
+
                     node.op.params[0] = dag_to_circuit(box_dag)
 
 

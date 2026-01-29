@@ -305,12 +305,10 @@ def annotated_qaoa_ansatz(  # pylint: disable=too-many-positional-arguments
 
     for inst in out_circuit:
         if inst.operation.name == "box":
-            if (
-                inst.operation.num_qubits != 0
-                and inst.operation.num_qubits != out_circuit.num_qubits
-            ):
+            if inst.operation.num_qubits not in (0, out_circuit.num_qubits):
                 raise NotImplementedError(
-                    "This constructor does not support incomplete graphs.",
-                    f"Expected instruction to act on {out_circuit.num_qubits}, instead, got {inst.operation.num_qubits}. ",
+                    "This constructor does not support incomplete graphs. ",
+                    f"Expected instruction to act on {out_circuit.num_qubits}, ",
+                    f"instead, got {inst.operation.num_qubits}.",
                 )
     return out_circuit

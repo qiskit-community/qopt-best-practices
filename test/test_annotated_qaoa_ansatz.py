@@ -102,6 +102,51 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             _ = annotated_qaoa_ansatz(cost_op, reps=2)
 
+    def test_dummy_mixer(self):
+        """Check that dummy mixers pass constructor checks."""
+
+        cost_op = SparsePauliOp.from_list(
+            [
+                ("IIIIIIIIZZ", 1.0 + 0.0j),
+                ("IIIIIIIZIZ", 1.0 + 0.0j),
+                ("IIIIIIZIIZ", 1.0 + 0.0j),
+                ("IIIIIZIIIZ", 1.0 + 0.0j),
+                ("IIIIZIIIIZ", 1.0 + 0.0j),
+                ("IIIZIIIIIZ", 1.0 + 0.0j),
+                ("IIZIIIIIIZ", 1.0 + 0.0j),
+                ("IZIIIIIIIZ", 1.0 + 0.0j),
+                ("ZIIIIIIIIZ", 1.0 + 0.0j),
+                ("IIZIIIIIZI", 1.0 + 0.0j),
+                ("IZIIIIIIZI", 1.0 + 0.0j),
+                ("IZIIIIIZII", 1.0 + 0.0j),
+                ("ZIIIIIIZII", 1.0 + 0.0j),
+                ("IIZIIIZIII", 1.0 + 0.0j),
+                ("ZIIIIIZIII", 1.0 + 0.0j),
+                ("IIZIIZIIII", 1.0 + 0.0j),
+                ("IIZIZIIIII", 1.0 + 0.0j),
+                ("IZIIZIIIII", 1.0 + 0.0j),
+                ("ZIIIZIIIII", 1.0 + 0.0j),
+                ("IIZZIIIIII", 1.0 + 0.0j),
+                ("IZIZIIIIII", 1.0 + 0.0j),
+                ("ZIIZIIIIII", 1.0 + 0.0j),
+                ("IZZIIIIIII", 1.0 + 0.0j),
+                ("ZZIIIIIIII", 1.0 + 0.0j),
+            ]
+        )
+
+        dummy_mixer_operator = SparsePauliOp.from_list(
+            [("I" * cost_op.num_qubits, 1)]
+        )  # An empty mixer
+
+        cost_layer = annotated_qaoa_ansatz(
+            cost_op,
+            reps=1,
+            initial_state=QuantumCircuit(cost_op.num_qubits),  # An empty initial state
+            mixer_operator=dummy_mixer_operator,
+            name="QAOA cost block",
+        )
+        self.assertEqual(cost_layer.num_qubits, cost_op.num_qubits)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,6 @@
 """Test the preset QAOA pass manager."""
 
+import re
 from unittest import TestCase
 
 from qiskit.primitives import StatevectorEstimator
@@ -7,11 +8,16 @@ from qiskit.providers.fake_provider import GenericBackendV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import CouplingMap, PassManager
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
+from qiskit import __version__ as qiskit_version
 
 from qopt_best_practices.circuit_library import annotated_qaoa_ansatz
 from qopt_best_practices.transpilation.annotated_transpilation_passes import UnrollBoxes
 from qopt_best_practices.transpilation.generate_preset_qaoa_pass_manager import (
     generate_preset_qaoa_pass_manager,
+)
+
+QISKIT_VERSION = tuple(
+    int(x) for x in re.match(r"\d+\.\d+\.\d", qiskit_version).group(0).split(".")[:3]
 )
 
 
@@ -49,7 +55,10 @@ class TestPresetQAOAPassManager(TestCase):
         qreg = isa_ansatz.qregs[0]
         creg = isa_ansatz.cregs[0]
 
-        expected_meas_map = {0: 1, 1: 0, 2: 3, 3: 2}
+        if QISKIT_VERSION[0] <= 2 and QISKIT_VERSION[1] < 3:
+            expected_meas_map = {0: 1, 1: 0, 2: 3, 3: 2}
+        else:
+            expected_meas_map = {0: 2, 1: 3, 2: 0, 3: 1}
 
         for inst in isa_ansatz.data:
             if inst.operation.name == "measure":

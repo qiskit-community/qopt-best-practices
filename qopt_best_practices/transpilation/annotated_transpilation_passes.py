@@ -40,6 +40,7 @@ class AnnotatedPrepareCostLayer(TransformationPass):
 
     def run(self, dag):
         """Run the pass."""
+        new_dag = dag.copy_empty_like()
         for node in dag.topological_op_nodes():
             if node.op.name == "box":
                 if "cost_layer" in node.op.annotations[0].namespace:
@@ -79,6 +80,8 @@ class AnnotatedPrepareCostLayer(TransformationPass):
                         )
 
                     node.op.params[0] = dag_to_circuit(box_dag)
+            new_dag.apply_operation_back(node.op, qargs=node.qargs, cargs=node.cargs)
+        return new_dag
 
 
 class AnnotatedCommuting2qGateRouter(TransformationPass):

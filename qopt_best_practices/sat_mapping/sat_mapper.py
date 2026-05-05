@@ -3,18 +3,17 @@ using the SAT approach from https://arxiv.org/abs/2212.05666.
 """
 
 from __future__ import annotations
-from typing import Union
 
 from dataclasses import dataclass
 from itertools import combinations
 from threading import Timer
+from typing import Union
 
 import networkx as nx
 import numpy as np
-
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
-
+from qiskit.circuit.parameterexpression import ParameterExpression
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
@@ -23,9 +22,9 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrat
 class SATResult:
     """A data class to hold the result of a SAT solver."""
 
-    satisfiable: bool  # Satisfiable is True if the SAT model could be solved in a given time.
+    satisfiable: (bool)  # Satisfiable is True if the SAT model could be solved in a given time.
     solution: dict  # The solution to the SAT problem if it is satisfiable.
-    mapping: list  # The mapping of nodes in the pattern graph to nodes in the target graph.
+    mapping: (list)  # The mapping of nodes in the pattern graph to nodes in the target graph.
     elapsed_time: float  # The time it took to solve the SAT model.
 
 
@@ -175,17 +174,20 @@ class SATMapper:
 
         Args:
             graph: The graph to remap. If a cost operator is provided then it will
-                internally be converted to a graph.
+                internally be converted to a graph for structure analysis, but the
+                original operator (including parametric coefficients) will be preserved
+                in the output.
             swap_strategy: The swap strategy to use to find the initial mapping.
 
         Returns:
-            tuple: A tuple containing the remapped graph, the edge map, and the number of layers of
-            the swap strategy that was used to find the initial mapping. If no solution is found
-            then the tuple contains None for each element.
+            tuple: A tuple containing the remapped graph/operator, the edge map, and the
+            number of layers of the swap strategy that was used to find the initial mapping.
+            If no solution is found then the tuple contains None for each element.
             Note the returned edge map `{k: v}` means that node `k` in the original
             graph gets mapped to node `v` in the Pauli strings.
         """
         op_input = isinstance(graph, SparsePauliOp)
+        original_op = graph if op_input else None
 
         if op_input:
             graph = self.op2graph(graph)
@@ -200,11 +202,43 @@ class SATMapper:
             remapped_graph = nx.relabel_nodes(graph, edge_map)
 
             if op_input:
-                return self.graph2op(remapped_graph), edge_map, min_k
+                # Remap the original operator to preserve parametric coefficients
+                remapped_op = self.remap_operator(original_op, edge_map)
+                return remapped_op, edge_map, min_k
 
             return remapped_graph, edge_map, min_k
         else:
             return None, None, None
+
+    @staticmethod
+    def remap_operator(operator: SparsePauliOp, qubit_map: dict[int, int]) -> SparsePauliOp:
+        """Remap qubits in a SparsePauliOp according to a qubit mapping.
+
+        Args:
+            operator: The operator to remap.
+            qubit_map: Dictionary mapping original qubit indices to new indices.
+
+        Returns:
+            A new SparsePauliOp with qubits remapped according to qubit_map.
+            Preserves all coefficients including parametric ones.
+        """
+        num_qubits = operator.num_qubits
+        pauli_list = []
+
+        for pauli_str, coeff in zip(operator.paulis, operator.coeffs):
+            # Create new Pauli string with remapped qubits
+            new_paulis = ["I"] * num_qubits
+            for qubit_idx, pauli_char in enumerate(str(pauli_str)[::-1]):
+                if pauli_char != "I":
+                    new_qubit_idx = qubit_map.get(qubit_idx, qubit_idx)
+                    new_paulis[new_qubit_idx] = pauli_char
+
+            pauli_list.append(("".join(new_paulis)[::-1], coeff))
+
+        # Use SparsePauliOp constructor to preserve parametric coefficients
+        pauli_strings = [p[0] for p in pauli_list]
+        coeffs = [p[1] for p in pauli_list]
+        return SparsePauliOp(pauli_strings, coeffs)
 
     @staticmethod
     def graph2op(graph: nx.Graph) -> SparsePauliOp:
@@ -220,15 +254,34 @@ class SATMapper:
 
     @staticmethod
     def op2graph(operator: SparsePauliOp) -> nx.Graph:
-        """Convert a cost operator to a graph."""
+        """Convert a cost operator to a graph.
+
+        Args:
+            operator: The SparsePauliOp to convert. If the operator contains
+                parametric coefficients (ParameterExpression), they will be
+                treated as having weight 1.0 for graph structure purposes.
+
+        Returns:
+            A NetworkX graph representing the operator structure.
+
+        Raises:
+            ValueError: If the operator is not quadratic (contains terms with
+                more than 2 Z operators).
+        """
         graph, edges = nx.Graph(), []
         for pauli_str, weight in operator.to_list():
             edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
 
+            # Handle parametric weights by using 1.0 as default
+            if isinstance(weight, ParameterExpression):
+                numeric_weight = 1.0
+            else:
+                numeric_weight = np.real(weight)
+
             if len(edge) == 1:
-                edges.append((edge[0], edge[0], np.real(weight)))
+                edges.append((edge[0], edge[0], numeric_weight))
             elif len(edge) == 2:
-                edges.append((edge[0], edge[1], np.real(weight)))
+                edges.append((edge[0], edge[1], numeric_weight))
             else:
                 raise ValueError(f"The operator {operator} is not Quadratic.")
 

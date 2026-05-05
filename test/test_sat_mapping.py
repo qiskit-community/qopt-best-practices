@@ -1,15 +1,18 @@
 """Tests for SAT Mapping Utils"""
 
-from unittest import TestCase
 import json
 import os
-import networkx as nx
+from unittest import TestCase
 
+import networkx as nx
+from qiskit.circuit import Parameter
+from qiskit.circuit.parameterexpression import ParameterExpression
+from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import CouplingMap
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
-from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
 from qopt_best_practices.sat_mapping import SATMapper
+from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
 
 
 class TestSwapStrategies(TestCase):
@@ -19,7 +22,9 @@ class TestSwapStrategies(TestCase):
         super().setUp()
 
         # load data
-        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
+        graph_file = os.path.join(
+            os.path.dirname(__file__), "data/graph_2layers_0seed.json"
+        )
 
         with open(graph_file, "r") as file:
             data = json.load(file)
@@ -30,9 +35,13 @@ class TestSwapStrategies(TestCase):
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
         self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
 
-        self.sat_mapping = {int(key): value for key, value in data["SAT mapping"].items()}
+        self.sat_mapping = {
+            int(key): value for key, value in data["SAT mapping"].items()
+        }
         self.min_k = data["min swap layers"]
-        self.swap_strategy = SwapStrategy.from_line(list(range(len(self.original_graph.nodes))))
+        self.swap_strategy = SwapStrategy.from_line(
+            list(range(len(self.original_graph.nodes)))
+        )
         self.basic_graphs = [nx.path_graph(5), nx.cycle_graph(7)]
 
     def test_find_initial_mappings(self):
@@ -118,3 +127,132 @@ class TestSwapStrategies(TestCase):
         self.assertIsNone(remapped_g)
         self.assertIsNone(edge_map)
         self.assertIsNone(min_sat_layers)
+
+    def test_parametric_hamiltonian(self):
+        """Test that SATMapper preserves parametric Hamiltonians correctly.
+
+        When a parametric cost Hamiltonian (with Parameter objects as coefficients)
+        is passed to remap_graph_with_sat, the parameters are preserved in the
+        remapped operator with the correct qubit mapping.
+        """
+        # Create a simple parametric Hamiltonian with Parameter weights
+        # H = c_0 * ZZ_01 + c_1 * ZZ_12 + c_2 * ZZ_23
+        c_0 = Parameter("c_0")
+        c_1 = Parameter("c_1")
+        c_2 = Parameter("c_2")
+
+        # Create parametric SparsePauliOp using direct constructor (not from_list)
+        pauli_strings = ["ZZII", "IZZI", "IIZZ"]
+        coeffs = [c_0, c_1, c_2]
+        parametric_hamiltonian = SparsePauliOp(pauli_strings, coeffs)
+
+        # Create a swap strategy for 4 qubits
+        swap_strategy = SwapStrategy.from_line([0, 1, 2, 3])
+
+        mapper = SATMapper()
+
+        # SATMapper should handle parametric Hamiltonians and preserve parameters
+        remapped_op, edge_map, min_layers = mapper.remap_graph_with_sat(
+            parametric_hamiltonian, swap_strategy
+        )
+
+        # Verify results - the mapping should succeed
+        self.assertIsNotNone(remapped_op)
+        self.assertIsNotNone(edge_map)
+        self.assertIsNotNone(min_layers)
+        self.assertIsInstance(remapped_op, SparsePauliOp)
+        self.assertIsInstance(edge_map, dict)
+        self.assertIsInstance(min_layers, int)
+
+        # Verify the remapped operator still has parametric coefficients
+        self.assertTrue(
+            any(isinstance(coeff, ParameterExpression) for coeff in remapped_op.coeffs)
+        )
+
+        # Verify all original parameters are present in remapped operator
+        original_params = set(parametric_hamiltonian.parameters)
+        remapped_params = set(remapped_op.parameters)
+        self.assertEqual(original_params, remapped_params)
+
+    def test_non_parametric_operator(self):
+        """Test SATMapper with non-parametric SparsePauliOp.
+
+        Verifies that the new parametric support doesn't break existing
+        functionality for numeric (non-parametric) operators.
+        """
+        # Create non-parametric Hamiltonian with numeric weights
+        pauli_strings = ["ZZII", "IZZI", "IIZZ"]
+        coeffs = [1.5, 2.0, 0.5]  # Different weights to verify preservation
+        numeric_hamiltonian = SparsePauliOp(pauli_strings, coeffs)
+
+        # Create swap strategy
+        swap_strategy = SwapStrategy.from_line([0, 1, 2, 3])
+
+        mapper = SATMapper()
+
+        # Apply SAT mapping
+        remapped_op, edge_map, min_layers = mapper.remap_graph_with_sat(
+            numeric_hamiltonian, swap_strategy
+        )
+
+        # Verify results
+        self.assertIsNotNone(remapped_op)
+        self.assertIsNotNone(edge_map)
+        self.assertIsNotNone(min_layers)
+        self.assertIsInstance(remapped_op, SparsePauliOp)
+        self.assertIsInstance(edge_map, dict)
+        self.assertIsInstance(min_layers, int)
+
+        # Verify no parameters in output (all numeric)
+        self.assertEqual(len(remapped_op.parameters), 0)
+
+        # Verify coefficients are preserved (not all 1.0)
+        coeffs_list = [abs(c) for c in remapped_op.coeffs]
+        self.assertEqual({1.5, 2.0, 0.5}, set(coeffs_list))
+
+    def test_parametric_hamiltonian_with_numeric_fallback(self):
+        """Test SATMapper with parametric Hamiltonian using numeric values.
+
+        This test verifies that if we bind parameters to numeric values first,
+        the SAT mapping works correctly.
+        """
+        # Create parametric Hamiltonian
+        c_0 = Parameter("c_0")
+        c_1 = Parameter("c_1")
+        c_2 = Parameter("c_2")
+
+        pauli_strings = ["ZZII", "IZZI", "IIZZ"]
+        coeffs = [c_0, c_1, c_2]
+        parametric_hamiltonian = SparsePauliOp(pauli_strings, coeffs)
+
+        # Bind parameters to numeric values
+        param_dict = {c_0: 1.0, c_1: 1.0, c_2: 1.0}
+        numeric_hamiltonian = parametric_hamiltonian.assign_parameters(param_dict)
+
+        # Verify numeric values before mapping
+        coeffs_before = [abs(c) for c in numeric_hamiltonian.coeffs]
+        self.assertEqual({1.0}, set(coeffs_before))
+        self.assertEqual(len(numeric_hamiltonian.parameters), 0)
+
+        # Create swap strategy
+        swap_strategy = SwapStrategy.from_line([0, 1, 2, 3])
+
+        mapper = SATMapper()
+
+        # This should work with numeric values
+        remapped_op, edge_map, min_layers = mapper.remap_graph_with_sat(
+            numeric_hamiltonian, swap_strategy
+        )
+
+        # Verify results
+        self.assertIsNotNone(remapped_op)
+        self.assertIsNotNone(edge_map)
+        self.assertIsNotNone(min_layers)
+        self.assertIsInstance(remapped_op, SparsePauliOp)
+        self.assertIsInstance(edge_map, dict)
+        self.assertIsInstance(min_layers, int)
+
+        # Verify numeric values after mapping are preserved
+        coeffs_after = [abs(c) for c in remapped_op.coeffs]
+        self.assertEqual({1.0}, set(coeffs_after))
+        self.assertEqual(len(remapped_op.parameters), 0)

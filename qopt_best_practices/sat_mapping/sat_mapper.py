@@ -231,22 +231,20 @@ class SATMapper:
             Preserves all coefficients including parametric ones.
         """
         num_qubits = operator.num_qubits
-        pauli_list = []
+        pauli_strings = []
 
-        for pauli_str, coeff in zip(operator.paulis, operator.coeffs):
+        for pauli_str in operator.paulis:
             # Create new Pauli string with remapped qubits
             new_paulis = ["I"] * num_qubits
-            for qubit_idx, pauli_char in enumerate(str(pauli_str)[::-1]):
+            for qubit_idx, pauli_char in enumerate(pauli_str.to_label()[::-1]):
                 if pauli_char != "I":
                     new_qubit_idx = qubit_map.get(qubit_idx, qubit_idx)
                     new_paulis[new_qubit_idx] = pauli_char
 
-            pauli_list.append(("".join(new_paulis)[::-1], coeff))
+            pauli_strings.append("".join(new_paulis)[::-1])
 
         # Use SparsePauliOp constructor to preserve parametric coefficients
-        pauli_strings = [p[0] for p in pauli_list]
-        coeffs = [p[1] for p in pauli_list]
-        return SparsePauliOp(pauli_strings, coeffs)
+        return SparsePauliOp(pauli_strings, operator.coeffs)
 
     @staticmethod
     def graph2op(graph: nx.Graph) -> SparsePauliOp:
@@ -292,7 +290,10 @@ class SATMapper:
             elif len(edge) == 2:
                 edges.append((edge[0], edge[1], numeric_weight))
             else:
-                raise ValueError(f"The operator {operator} is not Quadratic.")
+                raise ValueError(
+                    f"Only quadratic operators can be converted to a graph structure, "
+                    f"received {operator}, which is not quadratic."
+                )
 
         graph.add_weighted_edges_from(edges)
 

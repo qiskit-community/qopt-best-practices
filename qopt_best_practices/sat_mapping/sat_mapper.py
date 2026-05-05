@@ -22,10 +22,10 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrat
 class SATResult:
     """A data class to hold the result of a SAT solver."""
 
-    satisfiable: (bool)  # Satisfiable is True if the SAT model could be solved in a given time.
-    solution: dict  # The solution to the SAT problem if it is satisfiable.
-    mapping: (list)  # The mapping of nodes in the pattern graph to nodes in the target graph.
-    elapsed_time: float  # The time it took to solve the SAT model.
+    satisfiable: bool  # True if SAT model was solved within timeout.
+    solution: dict  # The solution to the SAT problem if satisfiable.
+    mapping: list  # Node mapping from pattern graph to target graph.
+    elapsed_time: float  # Time taken to solve the SAT model.
 
 
 class SATMapper:
@@ -125,7 +125,9 @@ class SATMapper:
             # full connectivity then its distance matrix will have entries with -1. These
             # entries must be treated as False.
             d_matrix = swap_strategy.distance_matrix
-            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(int)
+            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(
+                int
+            )
             # Make a cnf for the adjacency constraint
             cnf2 = []
             for e_0, e_1 in program_graph.edges:
@@ -156,11 +158,15 @@ class SATMapper:
                 if status:
                     # If the SAT problem is satisfiable, convert the solution to a mapping.
                     mapping = [vid2mapping[idx] for idx in sol if idx > 0]
-                    binary_search_results[num_layers] = SATResult(status, sol, mapping, e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, mapping, e_time
+                    )
                     max_layers = num_layers
                 else:
                     # If the SAT problem is unsatisfiable, return the last satisfiable solution.
-                    binary_search_results[num_layers] = SATResult(status, sol, [], e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, [], e_time
+                    )
                     min_layers = num_layers + 1
 
         return binary_search_results
@@ -173,10 +179,10 @@ class SATMapper:
         """Applies the SAT mapping.
 
         Args:
-            graph: The graph to remap. If a cost operator is provided then it will
-                internally be converted to a graph for structure analysis, but the
-                original operator (including parametric coefficients) will be preserved
-                in the output.
+            graph: The graph or operator to remap. Can be either a NetworkX Graph or a
+                SparsePauliOp. If a SparsePauliOp is provided, it will be internally
+                converted to a graph for structure analysis, while the original operator
+                (including parametric coefficients) is preserved in the output.
             swap_strategy: The swap strategy to use to find the initial mapping.
 
         Returns:
@@ -202,7 +208,7 @@ class SATMapper:
             remapped_graph = nx.relabel_nodes(graph, edge_map)
 
             if op_input:
-                # Remap the original operator to preserve parametric coefficients
+                # Remap the original operator directly to preserve parametric coefficients
                 remapped_op = self.remap_operator(original_op, edge_map)
                 return remapped_op, edge_map, min_k
 
@@ -211,7 +217,9 @@ class SATMapper:
             return None, None, None
 
     @staticmethod
-    def remap_operator(operator: SparsePauliOp, qubit_map: dict[int, int]) -> SparsePauliOp:
+    def remap_operator(
+        operator: SparsePauliOp, qubit_map: dict[int, int]
+    ) -> SparsePauliOp:
         """Remap qubits in a SparsePauliOp according to a qubit mapping.
 
         Args:
@@ -259,7 +267,8 @@ class SATMapper:
         Args:
             operator: The SparsePauliOp to convert. If the operator contains
                 parametric coefficients (ParameterExpression), they will be
-                treated as having weight 1.0 for graph structure purposes.
+                converted to weight 1.0 for graph structure analysis, since only
+                the connectivity pattern (not weights) matters for SAT mapping.
 
         Returns:
             A NetworkX graph representing the operator structure.
@@ -272,7 +281,7 @@ class SATMapper:
         for pauli_str, weight in operator.to_list():
             edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
 
-            # Handle parametric weights by using 1.0 as default
+            # Convert parametric weights to 1.0 for graph structure analysis
             if isinstance(weight, ParameterExpression):
                 numeric_weight = 1.0
             else:

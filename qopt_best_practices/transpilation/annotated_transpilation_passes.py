@@ -67,8 +67,9 @@ def _group_by_parametric_signature(
             free_params = param.parameters
 
             # Check if there are any parameters beyond the standard QAOA layer parameters
-            # Standard QAOA parameters follow the pattern γ[i] or β[i] (hardcoded in annotated_qaoa_ansatz)
-            # Any other parameters are custom coefficients (e.g., c_0, c_1, weights, etc.)
+            # Suggested:
+            # QAOA layer parameters (γ[i], β[i]) vs custom coefficients (c_0, c_1, etc.)
+
             custom_params = {
                 p
                 for p in free_params

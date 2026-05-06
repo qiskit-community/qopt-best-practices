@@ -1,35 +1,37 @@
 """Unit tests for annotated transpilation pipeline"""
 
 import unittest
+
 import networkx as nx
 from networkx import barabasi_albert_graph
-
+from qiskit.circuit.library import CXGate, qaoa_ansatz
 from qiskit.primitives import StatevectorEstimator
+from qiskit.providers.fake_provider import GenericBackendV2
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import Layout, PassManager
-from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
-    SwapStrategy,
-    Commuting2qGateRouter,
-)
-from qiskit.circuit.library import CXGate, qaoa_ansatz
 from qiskit.transpiler.passes import HighLevelSynthesis, InverseCancellation
-from qiskit.providers.fake_provider import GenericBackendV2
+from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
+    Commuting2qGateRouter,
+    SwapStrategy,
+)
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from qopt_best_practices.circuit_library import annotated_qaoa_ansatz
-from qopt_best_practices.utils import build_max_cut_paulis
-from qopt_best_practices.transpilation.cost_layer import get_cost_layer
-from qopt_best_practices.transpilation.prepare_cost_layer import PrepareCostLayer
-from qopt_best_practices.transpilation.swap_cancellation_pass import SwapToFinalMapping
-from qopt_best_practices.transpilation.qaoa_construction_pass import QAOAConstructionPass
 from qopt_best_practices.qubit_selection import BackendEvaluator
 from qopt_best_practices.transpilation import (
-    AnnotatedPrepareCostLayer,
     AnnotatedCommuting2qGateRouter,
+    AnnotatedPrepareCostLayer,
     AnnotatedSwapToFinalMapping,
     SynthesizeAndSimplifyCostLayer,
     UnrollBoxes,
 )
+from qopt_best_practices.transpilation.cost_layer import get_cost_layer
+from qopt_best_practices.transpilation.prepare_cost_layer import PrepareCostLayer
+from qopt_best_practices.transpilation.qaoa_construction_pass import (
+    QAOAConstructionPass,
+)
+from qopt_best_practices.transpilation.swap_cancellation_pass import SwapToFinalMapping
+from qopt_best_practices.utils import build_max_cut_paulis
 
 
 def get_problem_barabasi(n=4, m=3):
@@ -76,7 +78,12 @@ class TestAnnotatedTranspilation(unittest.TestCase):
             (1, 4, 2, [(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0), (2, 3, 1.0)]),
             (2, 4, 2, [(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0), (2, 3, 1.0)]),
             (3, 4, 2, [(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0), (2, 3, 1.0)]),
-            (2, 5, 3, [(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0), (2, 3, 1.0), (3, 4, 1.0)]),
+            (
+                2,
+                5,
+                3,
+                [(0, 1, 1.0), (0, 2, 1.0), (1, 2, 1.0), (2, 3, 1.0), (3, 4, 1.0)],
+            ),
             (
                 2,
                 7,
@@ -102,7 +109,9 @@ class TestAnnotatedTranspilation(unittest.TestCase):
     def _estimate(self, circuit, hamiltonian, param_values):
         circuit.remove_final_measurements()
         isa_hamiltonian = hamiltonian.apply_layout(circuit.layout)
-        result = self.estimator.run([(circuit, isa_hamiltonian, param_values)]).result()[0]
+        result = self.estimator.run(
+            [(circuit, isa_hamiltonian, param_values)]
+        ).result()[0]
         return list(result.data.values())
 
     def _assert_equivalence(self, expvals_1, expvals_2, circuit_1, circuit_2):
@@ -111,7 +120,13 @@ class TestAnnotatedTranspilation(unittest.TestCase):
             self.assertEqual(circuit_1.count_ops()[key], circuit_2.count_ops()[key])
 
     def _run_qopt_and_annot(  # pylint: disable=too-many-positional-arguments
-        self, cost_layer, hamiltonian, num_qaoa_layers, backend, initial_layout, optimized=False
+        self,
+        cost_layer,
+        hamiltonian,
+        num_qaoa_layers,
+        backend,
+        initial_layout,
+        optimized=False,
     ):
         """Run both the previous qopt pipeline and new annotated pipeline"""
 
@@ -146,7 +161,9 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         ]
         if optimized:
             annot_passes.append(
-                SynthesizeAndSimplifyCostLayer(basis_gates=["x", "cx", "sx", "rz", "id"])
+                SynthesizeAndSimplifyCostLayer(
+                    basis_gates=["x", "cx", "sx", "rz", "id"]
+                )
             )
         annot_passes.append(UnrollBoxes())
 
@@ -173,7 +190,9 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         swap_strategy, edge_coloring = self._get_swap_strategy(cost_layer)
 
         # Standard pipeline
-        standard_ansatz = qaoa_ansatz(hamiltonian, reps=num_qaoa_layers, mixer_operator=mixer_op)
+        standard_ansatz = qaoa_ansatz(
+            hamiltonian, reps=num_qaoa_layers, mixer_operator=mixer_op
+        )
         standard_pm = generate_preset_pass_manager(
             backend=backend, optimization_level=3, initial_layout=initial_layout
         )
@@ -191,7 +210,9 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         ]
         if optimized:
             annot_passes.append(
-                SynthesizeAndSimplifyCostLayer(basis_gates=["x", "cx", "sx", "rz", "id"])
+                SynthesizeAndSimplifyCostLayer(
+                    basis_gates=["x", "cx", "sx", "rz", "id"]
+                )
             )
         annot_passes.append(UnrollBoxes())
 
@@ -204,7 +225,13 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         return standard_transpiled, annot_transpiled
 
     def _run_comparison_qopt(  # pylint: disable=too-many-positional-arguments
-        self, hamiltonian, cost_layer, num_qaoa_layers, backend, initial_layout, optimized=False
+        self,
+        hamiltonian,
+        cost_layer,
+        num_qaoa_layers,
+        backend,
+        initial_layout,
+        optimized=False,
     ):
         """Run both transpilation pipelines and compare expectation values
         and number of final operations"""
@@ -215,7 +242,9 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         )
         eval_qopt = self._estimate(qopt_transpiled, hamiltonian, param_values)
         eval_annot = self._estimate(annot_transpiled, hamiltonian, param_values)
-        self._assert_equivalence(eval_annot, eval_qopt, annot_transpiled, qopt_transpiled)
+        self._assert_equivalence(
+            eval_annot, eval_qopt, annot_transpiled, qopt_transpiled
+        )
 
     def _run_comparison_standard(  # pylint: disable=too-many-positional-arguments
         self,
@@ -232,12 +261,20 @@ class TestAnnotatedTranspilation(unittest.TestCase):
 
         param_values = [5.11350346] * num_qaoa_layers + [5.52673212] * num_qaoa_layers
         standard_transpiled, annot_transpiled = self._run_standard_and_annot(
-            cost_layer, hamiltonian, mixer_op, num_qaoa_layers, backend, initial_layout, optimized
+            cost_layer,
+            hamiltonian,
+            mixer_op,
+            num_qaoa_layers,
+            backend,
+            initial_layout,
+            optimized,
         )
         eval_standard = self._estimate(standard_transpiled, hamiltonian, param_values)
         eval_annot = self._estimate(annot_transpiled, hamiltonian, param_values)
 
-        self._assert_equivalence(eval_annot, eval_standard, annot_transpiled, standard_transpiled)
+        self._assert_equivalence(
+            eval_annot, eval_standard, annot_transpiled, standard_transpiled
+        )
 
     def _run_all_cases(self, problem_fn, optimized=False):
         """Iterate over given test cases and run"""
@@ -255,7 +292,9 @@ class TestAnnotatedTranspilation(unittest.TestCase):
             with self.subTest(layers=layers, nodes=nodes, edges=edges):
                 hamiltonian, cost_layer, _ = get_problem_barabasi(n=nodes, m=edges)
                 backend, initial_layout = backend_and_layout_a(cost_layer)
-                self._run_comparison_qopt(hamiltonian, cost_layer, layers, backend, initial_layout)
+                self._run_comparison_qopt(
+                    hamiltonian, cost_layer, layers, backend, initial_layout
+                )
 
     def test_barabasi_albert_optimized(self):
         """Run comparison with barabasi albert graph and an additional synthesis/cancellation step."""
@@ -264,7 +303,12 @@ class TestAnnotatedTranspilation(unittest.TestCase):
                 hamiltonian, cost_layer, _ = get_problem_barabasi(n=nodes, m=edges)
                 backend, initial_layout = backend_and_layout_a(cost_layer)
                 self._run_comparison_qopt(
-                    hamiltonian, cost_layer, layers, backend, initial_layout, optimized=True
+                    hamiltonian,
+                    cost_layer,
+                    layers,
+                    backend,
+                    initial_layout,
+                    optimized=True,
                 )
 
     def test_maxcut_basic(self):
@@ -293,7 +337,13 @@ class TestAnnotatedTranspilation(unittest.TestCase):
         mixer_op = SparsePauliOp.from_list([("IIX", 1), ("IXI", 2), ("XII", 3)])
 
         self._run_comparison_standard(
-            hamiltonian, cost_layer, mixer_op, 1, backend, initial_layout, optimized=False
+            hamiltonian,
+            cost_layer,
+            mixer_op,
+            1,
+            backend,
+            initial_layout,
+            optimized=False,
         )
 
     def test_standard_two_local_mixer(self):
@@ -306,7 +356,13 @@ class TestAnnotatedTranspilation(unittest.TestCase):
 
         with self.assertRaises(NotImplementedError):
             self._run_standard_and_annot(
-                cost_layer, hamiltonian, mixer_op, 3, backend, initial_layout, optimized=False
+                cost_layer,
+                hamiltonian,
+                mixer_op,
+                3,
+                backend,
+                initial_layout,
+                optimized=False,
             )
 
     def test_cost_op_single_rz(self):
@@ -333,7 +389,109 @@ class TestAnnotatedTranspilation(unittest.TestCase):
             if inst.operation.name == "box":
                 if "cost_layer" in inst.operation.annotations[0].namespace:
                     box_circ = inst.operation.params[0]
-                    self.assertEqual(box_circ.count_ops(), {"rz": 4, "commuting_2q_block": 1})
+                    self.assertEqual(
+                        box_circ.count_ops(), {"rz": 4, "commuting_2q_block": 1}
+                    )
+
+
+class TestAnnotatedPrepareCostLayerParametric(unittest.TestCase):
+    """Test AnnotatedPrepareCostLayer with parametric Hamiltonians."""
+
+    @staticmethod
+    def _build_hamiltonian_from_graphs(graphs, param_names=None):
+        """Build Hamiltonian from graphs with optional parametric coefficients.
+
+        Args:
+            graphs: List of NetworkX graphs with edge weights
+            param_names: Optional list of parameter names. If None, uses numeric coefficients.
+
+        Returns:
+            SparsePauliOp: The resulting Hamiltonian
+        """
+        from qiskit.circuit.parameter import Parameter
+
+        hamiltonians = []
+        for graph in graphs:
+            pauli_list = []
+            for u, v, data in graph.edges(data=True):
+                weight = data["weight"]
+                pauli_str = ["I"] * len(graph.nodes)
+                pauli_str[len(graph.nodes) - 1 - u] = "Z"
+                pauli_str[len(graph.nodes) - 1 - v] = "Z"
+                pauli_list.append(("".join(pauli_str), weight))
+            hamiltonians.append(SparsePauliOp.from_list(pauli_list))
+
+        if param_names is None:
+            # Numeric sum
+            return SparsePauliOp.sum(hamiltonians)
+        else:
+            # Parametric weighted sum
+            params = [Parameter(name) for name in param_names]
+            weighted_terms = [c * H for c, H in zip(params, hamiltonians)]
+            return SparsePauliOp.sum(weighted_terms)
+
+    def test_parametric_identical_structures(self):
+        """Test parameter preservation with identical graph structures.
+
+        When multiple objectives have identical structures but different
+        parametric coefficients, all parameters must be preserved.
+        """
+        # Create 3 complete graphs with identical structure
+        graphs = [nx.complete_graph(4) for _ in range(3)]
+        for i, G in enumerate(graphs):
+            for u, v in G.edges():
+                G[u][v]["weight"] = float(i + 1)
+
+        # Build parametric Hamiltonian
+        hamiltonian = self._build_hamiltonian_from_graphs(graphs, ["c_0", "c_1", "c_2"])
+        circuit = annotated_qaoa_ansatz(hamiltonian, reps=1)
+
+        # Test AnnotatedPrepareCostLayer
+        pm = PassManager([AnnotatedPrepareCostLayer()])
+        result = pm.run(circuit)
+        params = {p.name for p in result.parameters}
+
+        # All parametric coefficients must be preserved
+        self.assertEqual(params, {"c_0", "c_1", "c_2", "β[0]", "γ[0]"})
+
+    def test_parametric_single_objective(self):
+        """Test single parametric objective is preserved."""
+        G = nx.complete_graph(4)
+        for u, v in G.edges():
+            G[u][v]["weight"] = 1.0
+
+        hamiltonian = self._build_hamiltonian_from_graphs([G], ["c_0"])
+        circuit = annotated_qaoa_ansatz(hamiltonian, reps=1)
+
+        pm = PassManager([AnnotatedPrepareCostLayer()])
+        result = pm.run(circuit)
+        params = {p.name for p in result.parameters}
+
+        self.assertEqual(params, {"c_0", "β[0]", "γ[0]"})
+
+    def test_numeric_circuit_optimization(self):
+        """Test numeric circuits are optimized correctly.
+
+        For fully numeric cost Hamiltonians, the AnnotatedPrepareCostLayer
+        pass absorbs γ (cost layer) parameters into the Commuting2qBlock
+        structure for optimization. β (mixer layer) parameters remain
+        visible as they are not processed by this pass.
+        """
+        # Create 2 graphs with numeric weights
+        graphs = [nx.complete_graph(4) for _ in range(2)]
+        for i, G in enumerate(graphs):
+            for u, v in G.edges():
+                G[u][v]["weight"] = float(i + 1)
+
+        hamiltonian = self._build_hamiltonian_from_graphs(graphs)
+        circuit = annotated_qaoa_ansatz(hamiltonian, reps=1)
+
+        pm = PassManager([AnnotatedPrepareCostLayer()])
+        result = pm.run(circuit)
+        params = {p.name for p in result.parameters}
+
+        # γ absorbed into Commuting2qBlock, β remains (in mixer layer)
+        self.assertEqual(params, {"β[0]"})
 
 
 if __name__ == "__main__":

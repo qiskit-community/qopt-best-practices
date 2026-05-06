@@ -1,25 +1,95 @@
 """Annotated QAOA transpilation passes"""
 
 from __future__ import annotations
+
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
-
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
-    SwapStrategy,
-)
-from qiskit.transpiler import TransformationPass
-from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.commuting_2q_block import (
-    Commuting2qBlock,
-)
-from qiskit.circuit import Gate, Qubit
+from qiskit.circuit import ClassicalRegister, Gate, Qubit
+from qiskit.circuit.library import Measure, SwapGate
 from qiskit.circuit.library.standard_gates import get_standard_gate_name_mapping
+from qiskit.circuit.parameterexpression import ParameterExpression
+from qiskit.converters import circuit_to_dag, dag_to_circuit
+from qiskit.dagcircuit import DAGCircuit, DAGOutNode
+from qiskit.transpiler import TransformationPass
 from qiskit.transpiler.exceptions import TranspilerError
 from qiskit.transpiler.layout import Layout
 from qiskit.transpiler.passes import HighLevelSynthesis, InverseCancellation
-from qiskit.dagcircuit import DAGOutNode, DAGCircuit, DAGOpNode
-from qiskit.circuit import ClassicalRegister
-from qiskit.circuit.library import SwapGate, Measure
-from qiskit.converters import dag_to_circuit, circuit_to_dag
+from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import (
+    SwapStrategy,
+)
+from qiskit.transpiler.passes.routing.commuting_2q_gate_routing.commuting_2q_block import (
+    Commuting2qBlock,
+)
+
+if TYPE_CHECKING:
+    from qiskit.dagcircuit import DAGOpNode
+
+
+def _group_by_parametric_signature(
+    nodes: list[DAGOpNode],
+) -> dict[str, list[DAGOpNode]]:
+    """Group DAG nodes by their parametric signature.
+
+    Nodes with the same parametric expression structure are grouped together.
+    All numeric (non-parametric) nodes are grouped together to allow optimization.
+
+    This preserves parametric coefficients when gates operate on the same qubits
+    but have different parametric expressions that should remain independent.
+
+    The key distinction is between:
+    - Expressions with custom parameters (e.g., c_0*γ, c_1*γ) - kept separate
+    - Expressions with only QAOA layer parameters (e.g., 2.5*γ, 1.0*β) - grouped together
+
+    Args:
+        nodes: List of DAGOpNode objects with rzz gates
+
+    Returns:
+        Mapping from parametric signature (string) to list of nodes with that signature
+
+    Example:
+        Gates with c_0*γ, c_1*γ, c_2*γ will be in separate groups (different c_i),
+        while gates with 1.0*γ, 2.0*γ, 3.0*γ will be in one group (only numeric coefficients).
+
+    Note:
+        This function assumes QAOA parameters follow the standard naming convention
+        γ[i] and β[i] as defined in annotated_qaoa_ansatz(). Any other parameters
+        are treated as custom coefficients that must be preserved independently.
+    """
+    groups = defaultdict(list)
+
+    for node in nodes:
+        # Get the parameter (angle) of the rzz gate
+        param = node.op.params[0]
+
+        if isinstance(param, ParameterExpression):
+            # Get the free parameters in this expression
+            free_params = param.parameters
+
+            # Check if there are any parameters beyond the standard QAOA layer parameters
+            # Standard QAOA parameters follow the pattern γ[i] or β[i] (hardcoded in annotated_qaoa_ansatz)
+            # Any other parameters are custom coefficients (e.g., c_0, c_1, weights, etc.)
+            custom_params = {
+                p
+                for p in free_params
+                if not (p.name.startswith("γ[") or p.name.startswith("β["))
+            }
+
+            if custom_params:
+                # Has custom parameters (e.g., c_0, c_1, c_2) - use full expression as signature
+                # This keeps gates with different custom parameters separate
+                signature = str(param)
+            else:
+                # Only has QAOA layer parameters (γ, β) with numeric coefficients
+                # Group these together for optimization
+                signature = "numeric"
+        else:
+            # Pure numeric value (no parameters at all)
+            signature = "numeric"
+
+        groups[signature].append(node)
+
+    return groups
 
 
 class AnnotatedPrepareCostLayer(TransformationPass):
@@ -36,6 +106,12 @@ class AnnotatedPrepareCostLayer(TransformationPass):
     Note that high order terms (i.e. cubic and more) produce ladders of
     CX gates with a Rz rotation when using `qaoa_ansatz`. This pass currently
     does not support high order terms.
+
+    Parametric Circuits:
+        This pass preserves parametric coefficients by grouping rzz gates
+        according to their parametric signature. Gates with different parametric
+        expressions are kept in separate blocks to prevent unwanted merging,
+        while numeric gates can still be optimized together.
     """
 
     def run(self, dag):
@@ -64,7 +140,8 @@ class AnnotatedPrepareCostLayer(TransformationPass):
                                 f"Found {box_node.op.name} instead."
                             )
 
-                    commuting_block = Commuting2qBlock(commuting_nodes)
+                    # Group rzz gates by parametric signature to preserve parametric coefficients
+                    param_groups = _group_by_parametric_signature(commuting_nodes)
 
                     wire_order = {
                         wire: idx
@@ -72,7 +149,14 @@ class AnnotatedPrepareCostLayer(TransformationPass):
                         if wire not in box_dag.idle_wires()
                     }
 
-                    box_dag.replace_block_with_op(commuting_nodes, commuting_block, wire_order)
+                    # Only create Commuting2qBlock for numeric gates
+                    # Parametric gates are left as individual rzz gates to preserve parameters
+                    if "numeric" in param_groups:
+                        numeric_nodes = param_groups["numeric"]
+                        commuting_block = Commuting2qBlock(numeric_nodes)
+                        box_dag.replace_block_with_op(
+                            numeric_nodes, commuting_block, wire_order
+                        )
 
                     for z_node in rz_gates:
                         box_dag.apply_operation_back(
@@ -133,7 +217,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
         if self._swap_strategy is None:
             swap_strategy = self.property_set["swap_strategy"]
             if swap_strategy is None:
-                raise TranspilerError("No swap strategy given at init or in the property set.")
+                raise TranspilerError(
+                    "No swap strategy given at init or in the property set."
+                )
         else:
             swap_strategy = self._swap_strategy
 
@@ -142,7 +228,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
                 f"{self.__class__.__name__} runs on circuits with one quantum register."
             )
         if len(dag.qubits) != next(iter(dag.qregs.values())).size:
-            raise TranspilerError("Circuit has qubits not contained in the qubit register.")
+            raise TranspilerError(
+                "Circuit has qubits not contained in the qubit register."
+            )
 
         if not dag.cregs:
             for qreg in dag.qregs.values():
@@ -159,10 +247,14 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
                     }
                     self.property_set["original_layout"] = Layout(input_qubit_mapping)
                     if self.property_set["original_qubit_indices"] is None:
-                        self.property_set["original_qubit_indices"] = input_qubit_mapping
+                        self.property_set["original_qubit_indices"] = (
+                            input_qubit_mapping
+                        )
 
                     new_dag = box_dag.copy_empty_like()
-                    current_layout = Layout.generate_trivial_layout(*box_dag.qregs.values())
+                    current_layout = Layout.generate_trivial_layout(
+                        *box_dag.qregs.values()
+                    )
                     # Used to keep track of nodes that do not decompose using swap strategies.
                     accumulator = new_dag.copy_empty_like()
 
@@ -206,7 +298,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
                                 if int(node.op.annotations[0].payload) % 2 == 1
                                 else dag.qubits[cidx]
                             )
-                            dag.apply_operation_back(Measure(), [qubit], [dag.clbits[cidx]])
+                            dag.apply_operation_back(
+                                Measure(), [qubit], [dag.clbits[cidx]]
+                            )
 
         return dag
 
@@ -237,7 +331,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
         # Re-initialize the node accumulator
         return new_dag.copy_empty_like()
 
-    def _position_in_cmap(self, dag: DAGCircuit, j: int, k: int, layout: Layout) -> tuple[int, ...]:
+    def _position_in_cmap(
+        self, dag: DAGCircuit, j: int, k: int, layout: Layout
+    ) -> tuple[int, ...]:
         """A helper function to track the movement of virtual qubits through the swaps.
 
         Args:
@@ -294,7 +390,7 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
 
     @staticmethod
     def _greedy_build_sub_layers(
-        current_layer: dict[tuple[int, int], Gate]
+        current_layer: dict[tuple[int, int], Gate],
     ) -> list[dict[tuple[int, int], Gate]]:
         """The greedy method of building sub-layers of commuting gates."""
         sub_layers = []
@@ -317,7 +413,11 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
         return sub_layers
 
     def swap_decompose(
-        self, dag: DAGCircuit, node: DAGOpNode, current_layout: Layout, swap_strategy: SwapStrategy
+        self,
+        dag: DAGCircuit,
+        node: DAGOpNode,
+        current_layout: Layout,
+        swap_strategy: SwapStrategy,
     ) -> DAGCircuit:
         """Take an instance of :class:`.Commuting2qBlock` and map it to the coupling map.
 
@@ -355,21 +455,30 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
 
             if i < max_distance:
                 for swap in swap_strategy.swap_layer(i):
-                    (j, k) = [trivial_layout.get_physical_bits()[vertex] for vertex in swap]
+                    (j, k) = [
+                        trivial_layout.get_physical_bits()[vertex] for vertex in swap
+                    ]
                     dag_with_swap.apply_operation_back(SwapGate(), [j, k])
                     current_layout.swap(j, k)
 
         return dag_with_swap
 
     def _make_op_layers(
-        self, dag: DAGCircuit, op: Commuting2qBlock, layout: Layout, swap_strategy: SwapStrategy
+        self,
+        dag: DAGCircuit,
+        op: Commuting2qBlock,
+        layout: Layout,
+        swap_strategy: SwapStrategy,
     ) -> dict[int, dict[tuple, Gate]]:
         """Creates layers of two-qubit gates based on the distance in the swap strategy."""
 
         gate_layers: dict[int, dict[tuple, Gate]] = defaultdict(dict)
 
         for node in op.node_block:
-            edge = (dag.find_bit(node.qargs[0]).index, dag.find_bit(node.qargs[1]).index)
+            edge = (
+                dag.find_bit(node.qargs[0]).index,
+                dag.find_bit(node.qargs[1]).index,
+            )
 
             bit0 = layout.get_virtual_bits()[dag.qubits[edge[0]]]
             bit1 = layout.get_virtual_bits()[dag.qubits[edge[1]]]
@@ -380,7 +489,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
 
         return gate_layers
 
-    def _check_edges(self, dag: DAGCircuit, node: DAGOpNode, swap_strategy: SwapStrategy):
+    def _check_edges(
+        self, dag: DAGCircuit, node: DAGOpNode, swap_strategy: SwapStrategy
+    ):
         """Check if the swap strategy can create the required connectivity.
 
         Args:
@@ -394,7 +505,10 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
         required_edges = set()
 
         for sub_node in node.op:
-            edge = (dag.find_bit(sub_node.qargs[0]).index, dag.find_bit(sub_node.qargs[1]).index)
+            edge = (
+                dag.find_bit(sub_node.qargs[0]).index,
+                dag.find_bit(sub_node.qargs[1]).index,
+            )
             required_edges.add(edge)
 
         # Check that the swap strategy supports all required edges
@@ -451,7 +565,9 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                         final_params
                     )
                     new_dag = circuit_to_dag(
-                        new_circuit.reverse_ops() if layer_index % 2 == 0 else new_circuit
+                        new_circuit.reverse_ops()
+                        if layer_index % 2 == 0
+                        else new_circuit
                     )
                     node.op.params[0] = dag_to_circuit(new_dag)
                 else:
@@ -477,7 +593,9 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                     node.op.params[0] = dag_to_circuit(new_dag)
 
         # Permute final measurements
-        measure_nodes = [node for node in dag.op_nodes() if isinstance(node.op, Measure)]
+        measure_nodes = [
+            node for node in dag.op_nodes() if isinstance(node.op, Measure)
+        ]
 
         if len(measure_nodes) > 0:
             for node in measure_nodes:

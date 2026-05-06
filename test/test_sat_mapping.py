@@ -136,7 +136,7 @@ class TestSwapStrategies(TestCase):
         c_1 = Parameter("c_1")
         c_2 = Parameter("c_2")
 
-        # Create parametric SparsePauliOp using direct constructor (not from_list) to ensure parameters are preserved
+        # Create parametric SparsePauliOp to ensure parameters are preserved
         pauli_strings = ["ZZII", "IZZI", "IIZZ"]
         coeffs = [c_0, c_1, c_2]
         parametric_hamiltonian = SparsePauliOp(pauli_strings, coeffs)

@@ -22,9 +22,7 @@ class TestSwapStrategies(TestCase):
         super().setUp()
 
         # load data
-        graph_file = os.path.join(
-            os.path.dirname(__file__), "data/graph_2layers_0seed.json"
-        )
+        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
 
         with open(graph_file, "r") as file:
             data = json.load(file)
@@ -35,13 +33,9 @@ class TestSwapStrategies(TestCase):
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
         self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
 
-        self.sat_mapping = {
-            int(key): value for key, value in data["SAT mapping"].items()
-        }
+        self.sat_mapping = {int(key): value for key, value in data["SAT mapping"].items()}
         self.min_k = data["min swap layers"]
-        self.swap_strategy = SwapStrategy.from_line(
-            list(range(len(self.original_graph.nodes)))
-        )
+        self.swap_strategy = SwapStrategy.from_line(list(range(len(self.original_graph.nodes))))
         self.basic_graphs = [nx.path_graph(5), nx.cycle_graph(7)]
 
     def test_find_initial_mappings(self):
@@ -166,9 +160,7 @@ class TestSwapStrategies(TestCase):
         self.assertIsInstance(min_layers, int)
 
         # Verify the remapped operator still has parametric coefficients
-        self.assertTrue(
-            any(isinstance(coeff, ParameterExpression) for coeff in remapped_op.coeffs)
-        )
+        self.assertTrue(any(isinstance(coeff, ParameterExpression) for coeff in remapped_op.coeffs))
 
         # Verify all original parameters are present in remapped operator
         original_params = set(parametric_hamiltonian.parameters)

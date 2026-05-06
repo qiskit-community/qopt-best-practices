@@ -125,9 +125,7 @@ class SATMapper:
             # full connectivity then its distance matrix will have entries with -1. These
             # entries must be treated as False.
             d_matrix = swap_strategy.distance_matrix
-            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(
-                int
-            )
+            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(int)
             # Make a cnf for the adjacency constraint
             cnf2 = []
             for e_0, e_1 in program_graph.edges:
@@ -158,15 +156,11 @@ class SATMapper:
                 if status:
                     # If the SAT problem is satisfiable, convert the solution to a mapping.
                     mapping = [vid2mapping[idx] for idx in sol if idx > 0]
-                    binary_search_results[num_layers] = SATResult(
-                        status, sol, mapping, e_time
-                    )
+                    binary_search_results[num_layers] = SATResult(status, sol, mapping, e_time)
                     max_layers = num_layers
                 else:
                     # If the SAT problem is unsatisfiable, return the last satisfiable solution.
-                    binary_search_results[num_layers] = SATResult(
-                        status, sol, [], e_time
-                    )
+                    binary_search_results[num_layers] = SATResult(status, sol, [], e_time)
                     min_layers = num_layers + 1
 
         return binary_search_results
@@ -217,9 +211,7 @@ class SATMapper:
             return None, None, None
 
     @staticmethod
-    def remap_operator(
-        operator: SparsePauliOp, qubit_map: dict[int, int]
-    ) -> SparsePauliOp:
+    def remap_operator(operator: SparsePauliOp, qubit_map: dict[int, int]) -> SparsePauliOp:
         """Remap qubits in a SparsePauliOp according to a qubit mapping.
 
         Args:

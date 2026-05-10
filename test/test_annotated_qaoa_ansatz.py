@@ -37,13 +37,9 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
         for i, instr in enumerate(circuit.data):
             self.assertEqual(instr.operation.name, "box")
             if i == 0:
-                self.assertEqual(
-                    instr.operation.annotations[0].namespace, "qaoa.init_state"
-                )
+                self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.init_state")
             elif i == 1:
-                self.assertEqual(
-                    instr.operation.annotations[0].namespace, "qaoa.cost_layer"
-                )
+                self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.cost_layer")
             else:
                 self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.mixer")
 

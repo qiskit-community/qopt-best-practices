@@ -4,11 +4,18 @@ import unittest
 
 from networkx import barabasi_albert_graph
 from qiskit import QuantumCircuit
+from qiskit import __version__ as qiskit_version
 from qiskit.circuit import ParameterExpression, ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 
 from qopt_best_practices.circuit_library import annotated_qaoa_ansatz
 from qopt_best_practices.utils import build_max_cut_paulis
+
+
+def _qiskit_version_tuple():
+    """Parse Qiskit version string into tuple of integers."""
+    version_parts = qiskit_version.split(".")
+    return tuple(int(part) for part in version_parts[:2])
 
 
 class TestAnnotatedQAOAAnsatz(unittest.TestCase):
@@ -37,9 +44,13 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
         for i, instr in enumerate(circuit.data):
             self.assertEqual(instr.operation.name, "box")
             if i == 0:
-                self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.init_state")
+                self.assertEqual(
+                    instr.operation.annotations[0].namespace, "qaoa.init_state"
+                )
             elif i == 1:
-                self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.cost_layer")
+                self.assertEqual(
+                    instr.operation.annotations[0].namespace, "qaoa.cost_layer"
+                )
             else:
                 self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.mixer")
 
@@ -116,15 +127,28 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
             ]
         )
 
-        circuit = annotated_qaoa_ansatz(cost_op, reps=2)
+        qiskit_ver = _qiskit_version_tuple()
 
-        # Verify the circuit was created successfully
-        self.assertEqual(circuit.num_qubits, 39)
-        self.assertEqual(len(circuit.parameters), 4)  # 2 reps * 2 params (gamma, beta)
+        if qiskit_ver < (2, 4):
+            # In Qiskit < 2.4, disconnected graphs are not supported
+            with self.assertRaises(NotImplementedError) as context:
+                annotated_qaoa_ansatz(cost_op, reps=2)
+            self.assertIn("disconnected graphs", str(context.exception))
+        else:
+            # In Qiskit >= 2.4, disconnected graphs should work
+            circuit = annotated_qaoa_ansatz(cost_op, reps=2)
 
-        # Verify parameters can be bound
-        bound_circuit = circuit.assign_parameters({p: 0.1 for p in circuit.parameters})
-        self.assertEqual(bound_circuit.num_qubits, 39)
+            # Verify the circuit was created successfully
+            self.assertEqual(circuit.num_qubits, 39)
+            self.assertEqual(
+                len(circuit.parameters), 4
+            )  # 2 reps * 2 params (gamma, beta)
+
+            # Verify parameters can be bound
+            bound_circuit = circuit.assign_parameters(
+                {p: 0.1 for p in circuit.parameters}
+            )
+            self.assertEqual(bound_circuit.num_qubits, 39)
 
     def test_dummy_mixer(self):
         """Check that dummy mixers pass constructor checks."""

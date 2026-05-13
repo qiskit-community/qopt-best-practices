@@ -13,7 +13,6 @@ import networkx as nx
 import numpy as np
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
-from qiskit.circuit.parameterexpression import ParameterExpression
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
@@ -208,7 +207,7 @@ class SATMapper:
             remapped_graph = nx.relabel_nodes(graph, edge_map)
 
             if op_input:
-                # Use Qiskit's built-in apply_layout to remap the operator
+                # Remap the operator.
                 # apply_layout requires a list where list[i] = new position of qubit i
                 layout_list = [
                     edge_map.get(i, i) for i in range(original_op.num_qubits)
@@ -237,10 +236,9 @@ class SATMapper:
         """Convert a cost operator to a graph.
 
         Args:
-            operator: The SparsePauliOp to convert. If the operator contains
-                parametric coefficients (ParameterExpression), they will be
-                converted to weight 1.0 for graph structure analysis, since only
-                the connectivity pattern (not weights) matters for SAT mapping.
+            operator: The SparsePauliOp to convert. Edge weights are preserved
+                as-is, including ParameterExpression objects. The SAT mapping
+                algorithm only uses graph structure (connectivity), not weights.
 
         Returns:
             A NetworkX graph representing the operator structure.
@@ -253,16 +251,12 @@ class SATMapper:
         for pauli_str, weight in operator.to_list():
             edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
 
-            # Convert parametric weights to 1.0 for graph structure analysis
-            if isinstance(weight, ParameterExpression):
-                numeric_weight = 1.0
-            else:
-                numeric_weight = np.real(weight)
-
             if len(edge) == 1:
-                edges.append((edge[0], edge[0], numeric_weight))
+                # Self-loop for single Z terms
+                edges.append((edge[0], edge[0], weight))
             elif len(edge) == 2:
-                edges.append((edge[0], edge[1], numeric_weight))
+                # Edge for ZZ terms
+                edges.append((edge[0], edge[1], weight))
             else:
                 raise ValueError(
                     f"Only quadratic operators can be converted to a graph structure, "

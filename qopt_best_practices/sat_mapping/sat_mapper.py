@@ -234,9 +234,9 @@ class SATMapper:
             edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
 
             if len(edge) == 1:
-                edges.append((edge[0], edge[0], np.real(weight)))
+                edges.append((edge[0], edge[0], weight))
             elif len(edge) == 2:
-                edges.append((edge[0], edge[1], np.real(weight)))
+                edges.append((edge[0], edge[1], weight))
             else:
                 raise ValueError(f"The operator {operator} is not Quadratic.")
 

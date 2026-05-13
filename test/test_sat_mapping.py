@@ -67,6 +67,28 @@ class TestSwapStrategies(TestCase):
 
         self.assertTrue(nx.is_isomorphic(remapped_g, self.mapped_graph))
 
+    def test_remap_graph_with_sat_parametric_weights(self):
+        """Test remap_graph_with_sat preserves parametric weights"""
+
+        mapper = SATMapper()
+        parametric_graph = self.original_graph.copy()
+        for i, (u, v) in enumerate(parametric_graph.edges()):
+            parametric_graph[u][v]["weight"] = f"w_{i}"
+
+        remapped_g, _, _ = mapper.remap_graph_with_sat(
+            graph=parametric_graph, swap_strategy=self.swap_strategy
+        )
+
+        self.assertTrue(nx.is_isomorphic(remapped_g, self.mapped_graph))
+        original_weights = {
+            data["weight"] for _, _, data in parametric_graph.edges(data=True)
+        }
+        remapped_weights = {
+            data["weight"] for _, _, data in remapped_g.edges(data=True)
+        }
+
+        self.assertEqual(original_weights, remapped_weights)
+
     def test_deficient_strategy(self):
         """Test that the SAT mapper works when the SWAP strategy is deficient.
 

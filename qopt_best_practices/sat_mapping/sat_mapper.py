@@ -125,7 +125,9 @@ class SATMapper:
             # full connectivity then its distance matrix will have entries with -1. These
             # entries must be treated as False.
             d_matrix = swap_strategy.distance_matrix
-            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(int)
+            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(
+                int
+            )
             # Make a cnf for the adjacency constraint
             cnf2 = []
             for e_0, e_1 in program_graph.edges:
@@ -156,11 +158,15 @@ class SATMapper:
                 if status:
                     # If the SAT problem is satisfiable, convert the solution to a mapping.
                     mapping = [vid2mapping[idx] for idx in sol if idx > 0]
-                    binary_search_results[num_layers] = SATResult(status, sol, mapping, e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, mapping, e_time
+                    )
                     max_layers = num_layers
                 else:
                     # If the SAT problem is unsatisfiable, return the last satisfiable solution.
-                    binary_search_results[num_layers] = SATResult(status, sol, [], e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, [], e_time
+                    )
                     min_layers = num_layers + 1
 
         return binary_search_results
@@ -202,41 +208,17 @@ class SATMapper:
             remapped_graph = nx.relabel_nodes(graph, edge_map)
 
             if op_input:
-                # Remap the original operator directly to preserve parametric coefficients
-                remapped_op = self.remap_operator(original_op, edge_map)
+                # Use Qiskit's built-in apply_layout to remap the operator
+                # apply_layout requires a list where list[i] = new position of qubit i
+                layout_list = [
+                    edge_map.get(i, i) for i in range(original_op.num_qubits)
+                ]
+                remapped_op = original_op.apply_layout(layout_list)
                 return remapped_op, edge_map, min_k
 
             return remapped_graph, edge_map, min_k
         else:
             return None, None, None
-
-    @staticmethod
-    def remap_operator(operator: SparsePauliOp, qubit_map: dict[int, int]) -> SparsePauliOp:
-        """Remap qubits in a SparsePauliOp according to a qubit mapping.
-
-        Args:
-            operator: The operator to remap.
-            qubit_map: Dictionary mapping original qubit indices to new indices.
-
-        Returns:
-            A new SparsePauliOp with qubits remapped according to qubit_map.
-            Preserves all coefficients including parametric ones.
-        """
-        num_qubits = operator.num_qubits
-        pauli_strings = []
-
-        for pauli_str in operator.paulis:
-            # Create new Pauli string with remapped qubits
-            new_paulis = ["I"] * num_qubits
-            for qubit_idx, pauli_char in enumerate(pauli_str.to_label()[::-1]):
-                if pauli_char != "I":
-                    new_qubit_idx = qubit_map.get(qubit_idx, qubit_idx)
-                    new_paulis[new_qubit_idx] = pauli_char
-
-            pauli_strings.append("".join(new_paulis)[::-1])
-
-        # Use SparsePauliOp constructor to preserve parametric coefficients
-        return SparsePauliOp(pauli_strings, operator.coeffs)
 
     @staticmethod
     def graph2op(graph: nx.Graph) -> SparsePauliOp:

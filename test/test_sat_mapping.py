@@ -22,7 +22,9 @@ class TestSwapStrategies(TestCase):
         super().setUp()
 
         # load data
-        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
+        graph_file = os.path.join(
+            os.path.dirname(__file__), "data/graph_2layers_0seed.json"
+        )
 
         with open(graph_file, "r") as file:
             data = json.load(file)
@@ -33,9 +35,13 @@ class TestSwapStrategies(TestCase):
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
         self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
 
-        self.sat_mapping = {int(key): value for key, value in data["SAT mapping"].items()}
+        self.sat_mapping = {
+            int(key): value for key, value in data["SAT mapping"].items()
+        }
         self.min_k = data["min swap layers"]
-        self.swap_strategy = SwapStrategy.from_line(list(range(len(self.original_graph.nodes))))
+        self.swap_strategy = SwapStrategy.from_line(
+            list(range(len(self.original_graph.nodes)))
+        )
         self.basic_graphs = [nx.path_graph(5), nx.cycle_graph(7)]
 
     def test_find_initial_mappings(self):
@@ -160,7 +166,9 @@ class TestSwapStrategies(TestCase):
         self.assertIsInstance(min_layers, int)
 
         # Verify the remapped operator still has parametric coefficients
-        self.assertTrue(any(isinstance(coeff, ParameterExpression) for coeff in remapped_op.coeffs))
+        self.assertTrue(
+            any(isinstance(coeff, ParameterExpression) for coeff in remapped_op.coeffs)
+        )
 
         # Verify all original parameters are present in remapped operator
         original_params = set(parametric_hamiltonian.parameters)
@@ -245,31 +253,3 @@ class TestSwapStrategies(TestCase):
         self.assertIsInstance(edge_map, dict)
         coeffs_after = [abs(c) for c in remapped_op.coeffs]
         self.assertEqual({1.0}, set(coeffs_after))
-
-    def test_remap_operator_large_qubits(self):
-        """Test remap_operator with large number of qubits to verify to_label() doesn't truncate."""
-        num_qubits = 50
-
-        # Create operator with ZZ terms on qubits 0-1 and 48-49
-        pauli_strings = ["ZZ" + "I" * 48, "I" * 48 + "ZZ"]
-        coeffs = [1.0, 2.0]
-        large_operator = SparsePauliOp(pauli_strings, coeffs)
-
-        # Remap qubits
-        qubit_map = {0: 10, 1: 11, 48: 20, 49: 21}
-        remapped_op = SATMapper.remap_operator(large_operator, qubit_map)
-
-        # Verify structure
-        self.assertEqual(remapped_op.num_qubits, num_qubits)
-        self.assertEqual(len(remapped_op), 2)
-
-        # Verify coefficients preserved
-        coeffs_list = [abs(c) for c in remapped_op.coeffs]
-        self.assertEqual({1.0, 2.0}, set(coeffs_list))
-
-        # Verify no truncation - each label should have exactly 2 Z's and correct length
-        labels = [pauli.to_label() for pauli in remapped_op.paulis]
-        for label in labels:
-            self.assertEqual(label.count("Z"), 2)
-            self.assertEqual(len(label), num_qubits)
-        self.assertEqual(len(remapped_op.parameters), 0)

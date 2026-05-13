@@ -3,18 +3,16 @@ using the SAT approach from https://arxiv.org/abs/2212.05666.
 """
 
 from __future__ import annotations
-from typing import Union
 
 from dataclasses import dataclass
 from itertools import combinations
 from threading import Timer
+from typing import Union
 
 import networkx as nx
 import numpy as np
-
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
-
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
@@ -23,9 +21,13 @@ from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrat
 class SATResult:
     """A data class to hold the result of a SAT solver."""
 
-    satisfiable: bool  # Satisfiable is True if the SAT model could be solved in a given time.
+    satisfiable: (
+        bool  # Satisfiable is True if the SAT model could be solved in a given time.
+    )
     solution: dict  # The solution to the SAT problem if it is satisfiable.
-    mapping: list  # The mapping of nodes in the pattern graph to nodes in the target graph.
+    mapping: (
+        list  # The mapping of nodes in the pattern graph to nodes in the target graph.
+    )
     elapsed_time: float  # The time it took to solve the SAT model.
 
 
@@ -126,7 +128,9 @@ class SATMapper:
             # full connectivity then its distance matrix will have entries with -1. These
             # entries must be treated as False.
             d_matrix = swap_strategy.distance_matrix
-            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(int)
+            connectivity_matrix = ((-1 < d_matrix) & (d_matrix <= num_layers)).astype(
+                int
+            )
             # Make a cnf for the adjacency constraint
             cnf2 = []
             for e_0, e_1 in program_graph.edges:
@@ -157,11 +161,15 @@ class SATMapper:
                 if status:
                     # If the SAT problem is satisfiable, convert the solution to a mapping.
                     mapping = [vid2mapping[idx] for idx in sol if idx > 0]
-                    binary_search_results[num_layers] = SATResult(status, sol, mapping, e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, mapping, e_time
+                    )
                     max_layers = num_layers
                 else:
                     # If the SAT problem is unsatisfiable, return the last satisfiable solution.
-                    binary_search_results[num_layers] = SATResult(status, sol, [], e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, [], e_time
+                    )
                     min_layers = num_layers + 1
 
         return binary_search_results

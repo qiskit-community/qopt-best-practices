@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import itertools
 import typing
 import warnings
 from collections.abc import Sequence
-
+import itertools
 import numpy as np
+
 from qiskit.circuit import QuantumCircuit, annotation
 from qiskit.circuit.parametervector import ParameterVector
 from qiskit.quantum_info import Operator, Pauli, SparsePauliOp
@@ -144,9 +144,7 @@ def annotated_evolved_operator_ansatz(  # pylint: disable=too-many-positional-ar
         #    [[a0, a1, a2, ...], [b0, b1, b2, ...], [c0, c1, c2, ...]]
         # and turns them into an iterator
         #    a0 -> b0 -> c0 -> a1 -> b1 -> c1 -> a2 -> ...
-        per_operator = [
-            ParameterVector(prefix, reps).params for prefix in parameter_prefix
-        ]
+        per_operator = [ParameterVector(prefix, reps).params for prefix in parameter_prefix]
         param_iter = itertools.chain.from_iterable(zip(*per_operator))
 
     # slower, Python-path
@@ -212,17 +210,13 @@ def _is_pauli_identity(operator):
 
 
 def _remove_identities(operators, prefixes):
-    identity_ops = {
-        index for index, op in enumerate(operators) if _is_pauli_identity(op)
-    }
+    identity_ops = {index for index, op in enumerate(operators) if _is_pauli_identity(op)}
 
     if len(identity_ops) == 0:
         return operators, prefixes
 
     cleaned_ops = [op for i, op in enumerate(operators) if i not in identity_ops]
-    cleaned_prefix = [
-        prefix for i, prefix in enumerate(prefixes) if i not in identity_ops
-    ]
+    cleaned_prefix = [prefix for i, prefix in enumerate(prefixes) if i not in identity_ops]
 
     return cleaned_ops, cleaned_prefix
 
@@ -313,8 +307,8 @@ def annotated_qaoa_ansatz(  # pylint: disable=too-many-positional-arguments
         if inst.operation.name == "box":
             if inst.operation.num_qubits not in (0, out_circuit.num_qubits):
                 raise NotImplementedError(
-                    f"This constructor does not support incomplete graphs. "
-                    f"Expected instruction to act on {out_circuit.num_qubits}, "
-                    f"instead, got {inst.operation.num_qubits}."
+                    "This constructor does not support incomplete graphs. ",
+                    f"Expected instruction to act on {out_circuit.num_qubits}, ",
+                    f"instead, got {inst.operation.num_qubits}.",
                 )
     return out_circuit

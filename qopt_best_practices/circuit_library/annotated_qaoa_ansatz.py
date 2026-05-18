@@ -144,7 +144,9 @@ def annotated_evolved_operator_ansatz(  # pylint: disable=too-many-positional-ar
         #    [[a0, a1, a2, ...], [b0, b1, b2, ...], [c0, c1, c2, ...]]
         # and turns them into an iterator
         #    a0 -> b0 -> c0 -> a1 -> b1 -> c1 -> a2 -> ...
-        per_operator = [ParameterVector(prefix, reps).params for prefix in parameter_prefix]
+        per_operator = [
+            ParameterVector(prefix, reps).params for prefix in parameter_prefix
+        ]
         param_iter = itertools.chain.from_iterable(zip(*per_operator))
 
     # slower, Python-path
@@ -210,13 +212,17 @@ def _is_pauli_identity(operator):
 
 
 def _remove_identities(operators, prefixes):
-    identity_ops = {index for index, op in enumerate(operators) if _is_pauli_identity(op)}
+    identity_ops = {
+        index for index, op in enumerate(operators) if _is_pauli_identity(op)
+    }
 
     if len(identity_ops) == 0:
         return operators, prefixes
 
     cleaned_ops = [op for i, op in enumerate(operators) if i not in identity_ops]
-    cleaned_prefix = [prefix for i, prefix in enumerate(prefixes) if i not in identity_ops]
+    cleaned_prefix = [
+        prefix for i, prefix in enumerate(prefixes) if i not in identity_ops
+    ]
 
     return cleaned_ops, cleaned_prefix
 
@@ -303,10 +309,6 @@ def annotated_qaoa_ansatz(  # pylint: disable=too-many-positional-arguments
         copy=False,
     )
 
-    # Note: In Qiskit >= 2.4, disconnected graphs are handled correctly.
-    # The check below allows boxes with 0 qubits (for dummy mixers) or full circuit qubits.
-    # Prior to Qiskit 2.4, disconnected graphs would create boxes acting on subsets of qubits,
-    # which would be caught by this check. This is no longer the case.
     for inst in out_circuit:
         if inst.operation.name == "box":
             if inst.operation.num_qubits not in (0, out_circuit.num_qubits):

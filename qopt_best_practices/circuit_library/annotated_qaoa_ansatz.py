@@ -309,6 +309,9 @@ def annotated_qaoa_ansatz(  # pylint: disable=too-many-positional-arguments
         copy=False,
     )
 
+    # Prior to Qiskit 2.4, disconnected graphs would create boxes acting on subsets of qubits,
+    # which would be caught by this check. This is no longer the case.
+    # The check below allows boxes with 0 qubits (for dummy mixers) or full circuit qubits.
     for inst in out_circuit:
         if inst.operation.name == "box":
             if inst.operation.num_qubits not in (0, out_circuit.num_qubits):

@@ -69,7 +69,7 @@ def annotated_evolved_operator_ansatz(  # pylint: disable=too-many-positional-ar
     parameter_prefix: str | Sequence[str] = "t",
     remove_identities: bool = True,
     flatten: bool | None = None,
-    annotations: Sequence[annotation.Annotation] = None,
+    annotations: Sequence[annotation.Annotation] | None = None,
 ) -> QuantumCircuit:
     r"""Construct an ansatz out of operator evolutions with a series of annotations
 
@@ -158,9 +158,7 @@ def annotated_evolved_operator_ansatz(  # pylint: disable=too-many-positional-ar
         #    [[a0, a1, a2, ...], [b0, b1, b2, ...], [c0, c1, c2, ...]]
         # and turns them into an iterator
         #    a0 -> b0 -> c0 -> a1 -> b1 -> c1 -> a2 -> ...
-        per_operator = [
-            ParameterVector(prefix, reps).params for prefix in parameter_prefix
-        ]
+        per_operator = [ParameterVector(prefix, reps).params for prefix in parameter_prefix]
         param_iter = itertools.chain.from_iterable(zip(*per_operator))
 
     # slower, Python-path
@@ -226,17 +224,13 @@ def _is_pauli_identity(operator):
 
 
 def _remove_identities(operators, prefixes):
-    identity_ops = {
-        index for index, op in enumerate(operators) if _is_pauli_identity(op)
-    }
+    identity_ops = {index for index, op in enumerate(operators) if _is_pauli_identity(op)}
 
     if len(identity_ops) == 0:
         return operators, prefixes
 
     cleaned_ops = [op for i, op in enumerate(operators) if i not in identity_ops]
-    cleaned_prefix = [
-        prefix for i, prefix in enumerate(prefixes) if i not in identity_ops
-    ]
+    cleaned_prefix = [prefix for i, prefix in enumerate(prefixes) if i not in identity_ops]
 
     return cleaned_ops, cleaned_prefix
 

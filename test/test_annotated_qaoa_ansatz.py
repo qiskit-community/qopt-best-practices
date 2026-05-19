@@ -44,13 +44,9 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
         for i, instr in enumerate(circuit.data):
             self.assertEqual(instr.operation.name, "box")
             if i == 0:
-                self.assertEqual(
-                    instr.operation.annotations[0].namespace, "qaoa.init_state"
-                )
+                self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.init_state")
             elif i == 1:
-                self.assertEqual(
-                    instr.operation.annotations[0].namespace, "qaoa.cost_layer"
-                )
+                self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.cost_layer")
             else:
                 self.assertEqual(instr.operation.annotations[0].namespace, "qaoa.mixer")
 
@@ -140,14 +136,10 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
 
             # Verify the circuit was created successfully
             self.assertEqual(circuit.num_qubits, 39)
-            self.assertEqual(
-                len(circuit.parameters), 4
-            )  # 2 reps * 2 params (gamma, beta)
+            self.assertEqual(len(circuit.parameters), 4)  # 2 reps * 2 params (gamma, beta)
 
             # Verify parameters can be bound
-            bound_circuit = circuit.assign_parameters(
-                {p: 0.1 for p in circuit.parameters}
-            )
+            bound_circuit = circuit.assign_parameters({p: 0.1 for p in circuit.parameters})
             self.assertEqual(bound_circuit.num_qubits, 39)
 
     def test_dummy_mixer(self):

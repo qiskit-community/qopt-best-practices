@@ -9,7 +9,7 @@ from qiskit.transpiler import CouplingMap
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
 from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
-from qopt_best_practices.sat_mapping import SATMapper
+from qopt_best_practices.qubit_mapping import SATMapper
 
 
 class TestSwapStrategies(TestCase):

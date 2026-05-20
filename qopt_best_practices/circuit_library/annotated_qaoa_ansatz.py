@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import itertools
 import typing
 import warnings
 from collections.abc import Sequence
-import itertools
-import numpy as np
 
+import numpy as np
+from qiskit import __version__ as qiskit_version
 from qiskit.circuit import QuantumCircuit, annotation
 from qiskit.circuit.parametervector import ParameterVector
 from qiskit.quantum_info import Operator, Pauli, SparsePauliOp
@@ -46,6 +47,19 @@ class InitStateAnnotation(annotation.Annotation):
         self.payload = str(1)
 
 
+def _qiskit_version_tuple() -> tuple[int, int]:
+    version_parts = qiskit_version.split(".")
+    major = int(version_parts[0])
+    minor_digits = []
+    for character in version_parts[1]:
+        if character.isdigit():
+            minor_digits.append(character)
+        else:
+            break
+    minor = int("".join(minor_digits)) if minor_digits else 0
+    return major, minor
+
+
 def annotated_evolved_operator_ansatz(  # pylint: disable=too-many-positional-arguments
     operators: BaseOperator | Sequence[BaseOperator],
     reps: int = 1,
@@ -55,7 +69,7 @@ def annotated_evolved_operator_ansatz(  # pylint: disable=too-many-positional-ar
     parameter_prefix: str | Sequence[str] = "t",
     remove_identities: bool = True,
     flatten: bool | None = None,
-    annotations: Sequence[annotation.Annotation] = None,
+    annotations: Sequence[annotation.Annotation] | None = None,
 ) -> QuantumCircuit:
     r"""Construct an ansatz out of operator evolutions with a series of annotations
 
@@ -303,12 +317,18 @@ def annotated_qaoa_ansatz(  # pylint: disable=too-many-positional-arguments
         copy=False,
     )
 
-    for inst in out_circuit:
-        if inst.operation.name == "box":
-            if inst.operation.num_qubits not in (0, out_circuit.num_qubits):
-                raise NotImplementedError(
-                    "This constructor does not support incomplete graphs. ",
-                    f"Expected instruction to act on {out_circuit.num_qubits}, ",
-                    f"instead, got {inst.operation.num_qubits}.",
-                )
+    # Prior to Qiskit 2.4, disconnected graphs could create boxes acting on subsets of qubits.
+    # Keep the legacy validation only for those versions. Boxes with 0 qubits are allowed for
+    # dummy mixers.
+
+    if _qiskit_version_tuple() < (2, 4):
+        for inst in out_circuit:
+            if inst.operation.name == "box":
+                if inst.operation.num_qubits not in (0, out_circuit.num_qubits):
+                    raise NotImplementedError(
+                        f"This constructor does not support disconnected graphs on "
+                        f"Qiskit < 2.4. Expected instruction to act on "
+                        f"{out_circuit.num_qubits}, instead, got "
+                        f"{inst.operation.num_qubits}. Please update Qiskit."
+                    )
     return out_circuit

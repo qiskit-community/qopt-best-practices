@@ -1,14 +1,21 @@
 """Unit tests for the annotated qaoa ansatz function."""
 
 import unittest
-from networkx import barabasi_albert_graph
 
+from networkx import barabasi_albert_graph
 from qiskit import QuantumCircuit
-from qiskit.circuit import ParameterVector, ParameterExpression
+from qiskit import __version__ as qiskit_version
+from qiskit.circuit import ParameterExpression, ParameterVector
 from qiskit.quantum_info import SparsePauliOp
 
-from qopt_best_practices.utils import build_max_cut_paulis
 from qopt_best_practices.circuit_library import annotated_qaoa_ansatz
+from qopt_best_practices.utils import build_max_cut_paulis
+
+
+def _qiskit_version_tuple():
+    """Parse Qiskit version string into tuple of integers."""
+    version_parts = qiskit_version.split(".")
+    return tuple(int(part) for part in version_parts[:2])
 
 
 class TestAnnotatedQAOAAnsatz(unittest.TestCase):
@@ -79,28 +86,61 @@ class TestAnnotatedQAOAAnsatz(unittest.TestCase):
                 self.assertEqual(instr.operation.annotations[0].payload, "3")
 
     def test_disconnected_graph(self):
-        """Check that the constructor will fail if the graph is disconnected."""
+        """Check that disconnected graphs are handled correctly in Qiskit >= 2.4.
+
+        Note: Prior to Qiskit 2.4, disconnected graphs would create boxes acting on
+        subsets of qubits, which would raise NotImplementedError. In Qiskit 2.4+,
+        all boxes act on all qubits, so disconnected graphs work correctly.
+        """
 
         cost_op = SparsePauliOp.from_list(
             [
                 ("IIIIIIIIIIIZIIIIIIIIZIIIIIIIIIIIIIIIIII", (-0.7052117420058351 + 0j)),
-                ("IIIIIIIIIIIZIIIIZIIIIIIIIIIIIIIIIIIIIII", (-0.41310912458730803 + 0j)),
-                ("IIIIIIIIIIIIIIIIZZIIIIIIIIIIIIIIIIIIIII", (-0.13889026348769137 + 0j)),
+                (
+                    "IIIIIIIIIIIZIIIIZIIIIIIIIIIIIIIIIIIIIII",
+                    (-0.41310912458730803 + 0j),
+                ),
+                (
+                    "IIIIIIIIIIIIIIIIZZIIIIIIIIIIIIIIIIIIIII",
+                    (-0.13889026348769137 + 0j),
+                ),
                 ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIZZIIIIIIIII", (-1.2611637053747173 + 0j)),
                 ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIZIIZIIIIII", (-0.7849745661237995 + 0j)),
                 ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIZIIIIIIIIZ", (0.7613352014865872 + 0j)),
                 ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIZZ", (-1.171616190854362 + 0j)),
                 ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIZZI", (0.04701291466680199 + 0j)),
-                ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIZIIIIIZI", (-0.40542381697372243 + 0j)),
+                (
+                    "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIZIIIIIZI",
+                    (-0.40542381697372243 + 0j),
+                ),
                 ("IIIIIIIIIIIIIIIIIIIIIIIIIIZZIIIIIIIIIII", (-0.6962346022159056 + 0j)),
                 ("IIIIIIIIIIIIIIIIIIIIIIIIIIIZIIIIIIIIZII", (0.1925567945293817 + 0j)),
                 ("IIIIIIIIIIIIIIIIIIIIIIZZIIIIIIIIIIIIIII", (-0.2766391151103169 + 0j)),
-                ("IIIIIIIIIIIIIZIIIIIIIIZIIIIIIIIIIIIIIII", (-0.010835558499671294 + 0j)),
+                (
+                    "IIIIIIIIIIIIIZIIIIIIIIZIIIIIIIIIIIIIIII",
+                    (-0.010835558499671294 + 0j),
+                ),
             ]
         )
 
-        with self.assertRaises(NotImplementedError):
-            _ = annotated_qaoa_ansatz(cost_op, reps=2)
+        qiskit_ver = _qiskit_version_tuple()
+
+        if qiskit_ver < (2, 4):
+            # In Qiskit < 2.4, disconnected graphs are not supported
+            with self.assertRaises(NotImplementedError) as context:
+                annotated_qaoa_ansatz(cost_op, reps=2)
+            self.assertIn("disconnected graphs", str(context.exception))
+        else:
+            # In Qiskit >= 2.4, disconnected graphs should work
+            circuit = annotated_qaoa_ansatz(cost_op, reps=2)
+
+            # Verify the circuit was created successfully
+            self.assertEqual(circuit.num_qubits, 39)
+            self.assertEqual(len(circuit.parameters), 4)  # 2 reps * 2 params (gamma, beta)
+
+            # Verify parameters can be bound
+            bound_circuit = circuit.assign_parameters({p: 0.1 for p in circuit.parameters})
+            self.assertEqual(bound_circuit.num_qubits, 39)
 
     def test_dummy_mixer(self):
         """Check that dummy mixers pass constructor checks."""

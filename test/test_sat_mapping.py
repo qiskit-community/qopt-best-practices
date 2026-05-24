@@ -19,9 +19,7 @@ class TestSwapStrategies(TestCase):
         super().setUp()
 
         # load data
-        graph_file = os.path.join(
-            os.path.dirname(__file__), "data/graph_2layers_0seed.json"
-        )
+        graph_file = os.path.join(os.path.dirname(__file__), "data/graph_2layers_0seed.json")
 
         with open(graph_file, "r") as file:
             data = json.load(file)
@@ -32,13 +30,9 @@ class TestSwapStrategies(TestCase):
         self.mapped_paulis = [tuple(pauli) for pauli in data["paulis"]]
         self.mapped_graph = build_max_cut_graph(self.mapped_paulis)
 
-        self.sat_mapping = {
-            int(key): value for key, value in data["SAT mapping"].items()
-        }
+        self.sat_mapping = {int(key): value for key, value in data["SAT mapping"].items()}
         self.min_k = data["min swap layers"]
-        self.swap_strategy = SwapStrategy.from_line(
-            list(range(len(self.original_graph.nodes)))
-        )
+        self.swap_strategy = SwapStrategy.from_line(list(range(len(self.original_graph.nodes))))
         self.basic_graphs = [nx.path_graph(5), nx.cycle_graph(7)]
 
     def test_find_initial_mappings(self):
@@ -80,12 +74,8 @@ class TestSwapStrategies(TestCase):
         )
 
         self.assertTrue(nx.is_isomorphic(remapped_g, self.mapped_graph))
-        original_weights = {
-            data["weight"] for _, _, data in parametric_graph.edges(data=True)
-        }
-        remapped_weights = {
-            data["weight"] for _, _, data in remapped_g.edges(data=True)
-        }
+        original_weights = {data["weight"] for _, _, data in parametric_graph.edges(data=True)}
+        remapped_weights = {data["weight"] for _, _, data in remapped_g.edges(data=True)}
 
         self.assertEqual(original_weights, remapped_weights)
 

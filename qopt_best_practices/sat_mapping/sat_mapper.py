@@ -13,6 +13,7 @@ import networkx as nx
 import numpy as np
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
+from qiskit.circuit import ParameterExpression
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
@@ -229,14 +230,30 @@ class SATMapper:
     @staticmethod
     def op2graph(operator: SparsePauliOp) -> nx.Graph:
         """Convert a cost operator to a graph."""
+
+        def if_num_to_real(
+            value: complex | float | ParameterExpression,
+        ) -> float | ParameterExpression:
+            """Extract real part from numeric values, preserve ParameterExpression.
+            Raises:
+                TypeError: If value is not numeric or ParameterExpression.
+            """
+            if isinstance(value, ParameterExpression):
+                return value
+            if isinstance(value, (int, float, complex, np.number)):
+                return float(np.real(value))
+            raise TypeError(
+                f"Expected numeric value or ParameterExpression, got {type(value).__name__}"
+            )
+
         graph, edges = nx.Graph(), []
         for pauli_str, weight in operator.to_list():
             edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
 
             if len(edge) == 1:
-                edges.append((edge[0], edge[0], weight))
+                edges.append((edge[0], edge[0], if_num_to_real(weight)))
             elif len(edge) == 2:
-                edges.append((edge[0], edge[1], weight))
+                edges.append((edge[0], edge[1], if_num_to_real(weight)))
             else:
                 raise ValueError(f"The operator {operator} is not Quadratic.")
 

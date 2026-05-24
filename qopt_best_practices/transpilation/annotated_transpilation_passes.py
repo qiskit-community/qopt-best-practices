@@ -67,11 +67,11 @@ def _group_by_parametric_signature(
             free_params = param.parameters
 
             # Check if there are any parameters beyond the standard QAOA layer parameters
-            # Suggested:
             # QAOA layer parameters (γ[i], β[i]) vs custom coefficients (c_0, c_1, etc.)
-
             custom_params = {
-                p for p in free_params if not (p.name.startswith("γ[") or p.name.startswith("β["))
+                p
+                for p in free_params
+                if not (p.name.startswith("γ[") or p.name.startswith("β["))
             }
 
             if custom_params:
@@ -153,7 +153,9 @@ class AnnotatedPrepareCostLayer(TransformationPass):
                     if "numeric" in param_groups:
                         numeric_nodes = param_groups["numeric"]
                         commuting_block = Commuting2qBlock(numeric_nodes)
-                        box_dag.replace_block_with_op(numeric_nodes, commuting_block, wire_order)
+                        box_dag.replace_block_with_op(
+                            numeric_nodes, commuting_block, wire_order
+                        )
 
                     for z_node in rz_gates:
                         box_dag.apply_operation_back(
@@ -214,7 +216,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
         if self._swap_strategy is None:
             swap_strategy = self.property_set["swap_strategy"]
             if swap_strategy is None:
-                raise TranspilerError("No swap strategy given at init or in the property set.")
+                raise TranspilerError(
+                    "No swap strategy given at init or in the property set."
+                )
         else:
             swap_strategy = self._swap_strategy
 
@@ -223,7 +227,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
                 f"{self.__class__.__name__} runs on circuits with one quantum register."
             )
         if len(dag.qubits) != next(iter(dag.qregs.values())).size:
-            raise TranspilerError("Circuit has qubits not contained in the qubit register.")
+            raise TranspilerError(
+                "Circuit has qubits not contained in the qubit register."
+            )
 
         if not dag.cregs:
             for qreg in dag.qregs.values():
@@ -240,10 +246,14 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
                     }
                     self.property_set["original_layout"] = Layout(input_qubit_mapping)
                     if self.property_set["original_qubit_indices"] is None:
-                        self.property_set["original_qubit_indices"] = input_qubit_mapping
+                        self.property_set["original_qubit_indices"] = (
+                            input_qubit_mapping
+                        )
 
                     new_dag = box_dag.copy_empty_like()
-                    current_layout = Layout.generate_trivial_layout(*box_dag.qregs.values())
+                    current_layout = Layout.generate_trivial_layout(
+                        *box_dag.qregs.values()
+                    )
                     # Used to keep track of nodes that do not decompose using swap strategies.
                     accumulator = new_dag.copy_empty_like()
 
@@ -287,7 +297,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
                                 if int(node.op.annotations[0].payload) % 2 == 1
                                 else dag.qubits[cidx]
                             )
-                            dag.apply_operation_back(Measure(), [qubit], [dag.clbits[cidx]])
+                            dag.apply_operation_back(
+                                Measure(), [qubit], [dag.clbits[cidx]]
+                            )
 
         return dag
 
@@ -318,7 +330,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
         # Re-initialize the node accumulator
         return new_dag.copy_empty_like()
 
-    def _position_in_cmap(self, dag: DAGCircuit, j: int, k: int, layout: Layout) -> tuple[int, ...]:
+    def _position_in_cmap(
+        self, dag: DAGCircuit, j: int, k: int, layout: Layout
+    ) -> tuple[int, ...]:
         """A helper function to track the movement of virtual qubits through the swaps.
 
         Args:
@@ -440,7 +454,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
 
             if i < max_distance:
                 for swap in swap_strategy.swap_layer(i):
-                    (j, k) = [trivial_layout.get_physical_bits()[vertex] for vertex in swap]
+                    (j, k) = [
+                        trivial_layout.get_physical_bits()[vertex] for vertex in swap
+                    ]
                     dag_with_swap.apply_operation_back(SwapGate(), [j, k])
                     current_layout.swap(j, k)
 
@@ -472,7 +488,9 @@ class AnnotatedCommuting2qGateRouter(TransformationPass):
 
         return gate_layers
 
-    def _check_edges(self, dag: DAGCircuit, node: DAGOpNode, swap_strategy: SwapStrategy):
+    def _check_edges(
+        self, dag: DAGCircuit, node: DAGOpNode, swap_strategy: SwapStrategy
+    ):
         """Check if the swap strategy can create the required connectivity.
 
         Args:
@@ -546,7 +564,9 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                         final_params
                     )
                     new_dag = circuit_to_dag(
-                        new_circuit.reverse_ops() if layer_index % 2 == 0 else new_circuit
+                        new_circuit.reverse_ops()
+                        if layer_index % 2 == 0
+                        else new_circuit
                     )
                     node.op.params[0] = dag_to_circuit(new_dag)
                 else:
@@ -572,7 +592,9 @@ class AnnotatedSwapToFinalMapping(TransformationPass):
                     node.op.params[0] = dag_to_circuit(new_dag)
 
         # Permute final measurements
-        measure_nodes = [node for node in dag.op_nodes() if isinstance(node.op, Measure)]
+        measure_nodes = [
+            node for node in dag.op_nodes() if isinstance(node.op, Measure)
+        ]
 
         if len(measure_nodes) > 0:
             for node in measure_nodes:

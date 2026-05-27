@@ -18,13 +18,27 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
 
+def if_num_to_real(
+    value: complex | float | ParameterExpression,
+) -> float | ParameterExpression:
+    """Extract real part from numeric values, preserve ParameterExpression.
+    Raises:
+        TypeError: If value is not numeric or ParameterExpression.
+    """
+    if isinstance(value, ParameterExpression):
+        return value
+    if isinstance(value, (int, float, complex, np.number)):
+        return float(np.real(value))
+    raise TypeError(f"Expected numeric value or ParameterExpression, got {type(value).__name__}")
+
+
 @dataclass
 class SATResult:
     """A data class to hold the result of a SAT solver."""
 
-    satisfiable: (bool)  # Satisfiable is True if the SAT model could be solved in a given time.
+    satisfiable: bool  # Satisfiable is True if the SAT model could be solved in a given time.
     solution: dict  # The solution to the SAT problem if it is satisfiable.
-    mapping: (list)  # The mapping of nodes in the pattern graph to nodes in the target graph.
+    mapping: list  # The mapping of nodes in the pattern graph to nodes in the target graph.
     elapsed_time: float  # The time it took to solve the SAT model.
 
 
@@ -220,21 +234,6 @@ class SATMapper:
     @staticmethod
     def op2graph(operator: SparsePauliOp) -> nx.Graph:
         """Convert a cost operator to a graph."""
-
-        def if_num_to_real(
-            value: complex | float | ParameterExpression,
-        ) -> float | ParameterExpression:
-            """Extract real part from numeric values, preserve ParameterExpression.
-            Raises:
-                TypeError: If value is not numeric or ParameterExpression.
-            """
-            if isinstance(value, ParameterExpression):
-                return value
-            if isinstance(value, (int, float, complex, np.number)):
-                return float(np.real(value))
-            raise TypeError(
-                f"Expected numeric value or ParameterExpression, got {type(value).__name__}"
-            )
 
         graph, edges = nx.Graph(), []
         for pauli_str, weight in operator.to_list():

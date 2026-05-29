@@ -1,4 +1,4 @@
-# q-optimization-best-practices
+# qopt-best-practices
 
 A collection of guidelines to run quantum optimization algorithms on superconducting qubits with Qiskit,
 using as reference the Quantum Approximate Optimization Algorithm (QAOA) workflow.

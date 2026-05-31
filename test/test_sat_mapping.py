@@ -1,15 +1,15 @@
 """Tests for SAT Mapping Utils"""
 
-from unittest import TestCase
 import json
 import os
-import networkx as nx
+from unittest import TestCase
 
+import networkx as nx
 from qiskit.transpiler import CouplingMap
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
-from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
 from qopt_best_practices.sat_mapping import SATMapper
+from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
 
 
 class TestSwapStrategies(TestCase):
@@ -60,6 +60,24 @@ class TestSwapStrategies(TestCase):
         )
 
         self.assertTrue(nx.is_isomorphic(remapped_g, self.mapped_graph))
+
+    def test_remap_graph_with_sat_parametric_weights(self):
+        """Test remap_graph_with_sat preserves parametric weights"""
+
+        mapper = SATMapper()
+        parametric_graph = self.original_graph.copy()
+        for i, (node1, node2) in enumerate(parametric_graph.edges()):
+            parametric_graph[node1][node2]["weight"] = f"w_{i}"
+
+        remapped_g, _, _ = mapper.remap_graph_with_sat(
+            graph=parametric_graph, swap_strategy=self.swap_strategy
+        )
+
+        self.assertTrue(nx.is_isomorphic(remapped_g, self.mapped_graph))
+        original_weights = {data["weight"] for _, _, data in parametric_graph.edges(data=True)}
+        remapped_weights = {data["weight"] for _, _, data in remapped_g.edges(data=True)}
+
+        self.assertEqual(original_weights, remapped_weights)
 
     def test_deficient_strategy(self):
         """Test that the SAT mapper works when the SWAP strategy is deficient.

@@ -1,6 +1,16 @@
 """SAT Mapping and Simulated Annealing Mapping"""
 
+from .initial_mapping import InitialMapping, InitialMappingResult
 from .sat_mapper import SATMapper, SATResult
-from .simulated_annealing_mapper import SimulatedAnnealingMapper, SAResult, SWAP_pairs
+from .simulated_annealing_mapper import SAMapper, SimulatedAnnealingMapper, SAResult, SWAP_pairs
 
-__all__ = ["SATMapper", "SATResult", "SimulatedAnnealingMapper", "SAResult", "SWAP_pairs"]
+__all__ = [
+    "InitialMapping",
+    "InitialMappingResult",
+    "SATMapper",
+    "SATResult",
+    "SAMapper",
+    "SimulatedAnnealingMapper",
+    "SAResult",
+    "SWAP_pairs",
+]

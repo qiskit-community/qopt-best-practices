@@ -6,27 +6,42 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Union
 
 import random
 import math
 import networkx as nx
-import numpy as np
 
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
+from .initial_mapping import InitialMapping, InitialMappingResult
 
-@dataclass
-class SAResult:
+
+@dataclass(init=False)
+class SAResult(InitialMappingResult):
     """A data class to hold the result of a simulated annealing run."""
 
-    mapping: dict  # The best mapping found: {logical_qubit: physical_qubit}.
-    cost: float  # The best cost (negative count of invalid 2q connections).
-    elapsed_time: float  # Wall-clock time in seconds for the run.
+    def __init__(
+        self,
+        mapping: dict,
+        cost: float,
+        elapsed_time: float,
+        metadata: dict | None = None,
+    ):
+        """Initialize a simulated annealing mapping result."""
+        if metadata is None:
+            metadata = {}
+
+        super().__init__(
+            mapping=mapping,
+            objective_value=cost,
+            objective_name="cost",
+            elapsed_time=elapsed_time,
+            metadata={"cost": cost, **metadata},
+        )
 
 
-class SimulatedAnnealingMapper:
+class SAMapper(InitialMapping):
     r"""Solve the initial qubit mapping problem for commuting 2q-gate blocks
     using simulated annealing.
 
@@ -36,8 +51,8 @@ class SimulatedAnnealingMapper:
     number of program edges that are *not* natively adjacent on the hardware
     (i.e. edges that would otherwise require SWAP gates).
 
-    The interface mirrors :class:`SATMapper` so both classes can be used
-    interchangeably.
+    The class implements the shared :class:`InitialMapping` API so it can be
+    used interchangeably with :class:`SATMapper`.
     """
 
     def __init__(
@@ -113,13 +128,10 @@ class SimulatedAnnealingMapper:
         # identity placement over the padded logical register.
         initial_mapping = {i: i for i in range(n_physical)}
 
-        callback: dict = {"cost": [], "depth": [], "iterations": [], "T": []}
-
-        best_mapping_dict, best_cost, _ = simulated_annealing_func(
+        result = simulated_annealing_func(
             G_original=padded_program_graph,
             initial_mapping=initial_mapping,
             list_2q=list_2q,
-            callback=callback,
             initial_temp=self.initial_temp,
             cooling_rate=self.cooling_rate,
             stop_temp=self.stop_temp,
@@ -128,14 +140,14 @@ class SimulatedAnnealingMapper:
             max_restarts=self.max_restarts,
         )
 
-        elapsed = time.time() - t_start
-        return SAResult(mapping=best_mapping_dict, cost=best_cost, elapsed_time=elapsed)
+        result.elapsed_time = time.time() - t_start
+        return result
 
     def remap_graph_with_sa(
         self,
-        graph: Union[nx.Graph, SparsePauliOp],
+        graph: nx.Graph | SparsePauliOp,
         swap_strategy: SwapStrategy,
-    ) -> tuple[nx.Graph, dict, float] | tuple[None, None, None]:
+    ) -> tuple[nx.Graph | SparsePauliOp, dict, InitialMappingResult] | tuple[None, None, None]:
         """Apply the simulated annealing mapping.
 
         Args:
@@ -145,13 +157,13 @@ class SimulatedAnnealingMapper:
                 connectivity.
 
         Returns:
-            A 3-tuple ``(remapped_graph, edge_map, cost)`` where
+            A 3-tuple ``(remapped_graph, edge_map, result)`` where
 
             * ``remapped_graph`` – graph with nodes relabelled to physical
               qubit indices,
             * ``edge_map`` – ``{logical_qubit: physical_qubit}`` mapping,
-            * ``cost`` – best cost returned by the annealer (negative count
-              of invalid 2q connections; closer to 0 is better).
+            * ``result`` – common :class:`InitialMappingResult` with the best
+              cost returned by the annealer as its objective value.
 
             If the mapping fails (e.g. too few physical qubits), returns
             ``(None, None, None)``.
@@ -160,60 +172,7 @@ class SimulatedAnnealingMapper:
             The returned ``edge_map`` ``{k: v}`` means that node ``k`` in the
             original graph gets mapped to physical qubit ``v``.
         """
-        op_input = isinstance(graph, SparsePauliOp)
-
-        if op_input:
-            graph = self.op2graph(graph)
-
-        try:
-            result = self.find_initial_mapping(graph, swap_strategy)
-        except ValueError:
-            return None, None, None
-
-        # Only keep the entries that correspond to logical qubits used by the
-        # program graph (nodes 0 .. n_logical-1).
-        n_logical = graph.number_of_nodes()
-        edge_map = {k: v for k, v in result.mapping.items() if k < n_logical}
-
-        remapped_graph = nx.relabel_nodes(graph, edge_map)
-
-        if op_input:
-            return self.graph2op(remapped_graph), edge_map, result.cost
-
-        return remapped_graph, edge_map, result.cost
-
-    # ------------------------------------------------------------------
-    # Helpers shared with SATMapper
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def graph2op(graph: nx.Graph) -> SparsePauliOp:
-        """Convert a graph into a sparse Pauli operator."""
-        pauli_list = []
-        for node1, node2, data in graph.edges(data=True):
-            paulis = ["I"] * len(graph)
-            paulis[node1], paulis[node2] = "Z", "Z"
-            weight = data["weight"] if "weight" in data else 1.0
-            pauli_list.append(("".join(paulis)[::-1], weight))
-
-        return SparsePauliOp.from_list(pauli_list)
-
-    @staticmethod
-    def op2graph(operator: SparsePauliOp) -> nx.Graph:
-        """Convert a cost operator to a graph."""
-        graph, edges = nx.Graph(), []
-        for pauli_str, weight in operator.to_list():
-            edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
-
-            if len(edge) == 1:
-                edges.append((edge[0], edge[0], np.real(weight)))
-            elif len(edge) == 2:
-                edges.append((edge[0], edge[1], np.real(weight)))
-            else:
-                raise ValueError(f"The operator {operator} is not Quadratic.")
-
-        graph.add_weighted_edges_from(edges)
-        return graph
+        return self.remap_graph(graph, swap_strategy)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -238,20 +197,33 @@ class SimulatedAnnealingMapper:
         return hardware_graph
 
 
+class SimulatedAnnealingMapper(SAMapper):
+    """Backward-compatible name for :class:`SAMapper`."""
+
 
 def SWAP_pairs(nq):
     qubit_order = list(range(nq))
-    list_2q = [[(qubit_order[ii],qubit_order[ii+1]) for ii in range(0, nq-1, 2)]]
+    list_2q = [[(qubit_order[ii], qubit_order[ii + 1]) for ii in range(0, nq - 1, 2)]]
     for i in range(0, nq):
-        for j in range(i % 2, nq-1, 2):
-            qubit_order[j], qubit_order[j+1] = qubit_order[j+1], qubit_order[j]
-        list_2q.append([tuple([qubit_order[ii],qubit_order[ii+1]]) for ii in range(i%2, nq-1, 2)])
+        for j in range(i % 2, nq - 1, 2):
+            qubit_order[j], qubit_order[j + 1] = qubit_order[j + 1], qubit_order[j]
+        list_2q.append(
+            [tuple([qubit_order[ii], qubit_order[ii + 1]]) for ii in range(i % 2, nq - 1, 2)]
+        )
     return list_2q
 
 
-def simulated_annealing_func(G_original: nx.Graph, initial_mapping: dict, list_2q: list, callback: dict,
-                             initial_temp=0.01, cooling_rate=0.9999,
-                             stop_temp=1e-8, max_iter=10000, verbose=False, max_restarts=5):
+def simulated_annealing_func(
+    G_original: nx.Graph,
+    initial_mapping: dict,
+    list_2q: list,
+    initial_temp=0.01,
+    cooling_rate=0.9999,
+    stop_temp=1e-8,
+    max_iter=10000,
+    verbose=False,
+    max_restarts=5,
+) -> SAResult:
     n = G_original.number_of_nodes()
     max_iter = int(max_iter)
 
@@ -312,7 +284,7 @@ def simulated_annealing_func(G_original: nx.Graph, initial_mapping: dict, list_2
 
     T = initial_temp
     iteration = 0
-    current_iter = callback["iterations"][-1] if callback["iterations"] else 0
+    trace: dict = {"cost": [], "depth": [], "iterations": [], "T": []}
 
     # Local references for hot-path speedup
     _randint = random.randint
@@ -320,23 +292,20 @@ def simulated_annealing_func(G_original: nx.Graph, initial_mapping: dict, list_2
     _exp = math.exp
     n_minus_1 = n - 1
     n_minus_2 = n - 2
-    best_cost_all = 0
-    best_mapping_all = None
+    best_overall_cost = best_cost
+    best_overall_mapping = best_mapping[:]
 
     for _ in range(max_restarts):
         T = initial_temp
         iteration = 0
-        current_iter = callback["iterations"][-1] if callback["iterations"] else 0
+        current_iter = trace["iterations"][-1] if trace["iterations"] else 0
         mapping = [initial_mapping[k] for k in range(n)]
         recompute_layer_counts()
-        if best_cost < best_cost_all:
-            best_cost_all = best_cost
-            best_mapping_all = best_mapping[:]
         current_cost, current_depth = compute_cost_depth()
         best_mapping = mapping[:]
         best_cost = current_cost
         best_depth = current_depth
-        
+
         while T > stop_temp and iteration < max_iter:
             # Fast random pair selection (avoids range() + sample())
             i = _randint(0, n_minus_1)
@@ -389,13 +358,15 @@ def simulated_annealing_func(G_original: nx.Graph, initial_mapping: dict, list_2
                     best_depth = current_depth
 
                     if verbose:
-                        print(f"best depth:{best_depth} | best cost:{best_cost} | iteration:{iteration} | T:{T:.4f}")
+                        print(
+                            f"best depth:{best_depth} | best cost:{best_cost} | iteration:{iteration} | T:{T:.4f}"
+                        )
 
-                    callback["cost"].append(best_cost)
-                    callback["depth"].append(best_depth)
-                    callback["iterations"].append(current_iter + iteration)
-                    callback["T"].append(T)
-                    
+                    trace["cost"].append(best_cost)
+                    trace["depth"].append(best_depth)
+                    trace["iterations"].append(current_iter + iteration)
+                    trace["T"].append(T)
+
             else:
                 # Reject: revert incremental changes
                 for l_idx, delta in changes:
@@ -405,7 +376,16 @@ def simulated_annealing_func(G_original: nx.Graph, initial_mapping: dict, list_2
             T *= cooling_rate
             iteration += 1
 
-    best_mapping_dict = dict(enumerate(best_mapping_all))
+        if best_cost < best_overall_cost:
+            best_overall_cost = best_cost
+            best_overall_mapping = best_mapping[:]
 
-    best_mapping_dict = {v: k for k, v in best_mapping_dict.items()}
-    return best_mapping_dict, best_cost_all, callback
+    best_mapping = dict(enumerate(best_overall_mapping))
+
+    best_mapping = {v: k for k, v in best_mapping.items()}
+    return SAResult(
+        mapping=best_mapping,
+        cost=best_overall_cost,
+        elapsed_time=0.0,
+        metadata={"trace": trace},
+    )

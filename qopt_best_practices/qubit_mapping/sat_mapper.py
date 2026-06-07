@@ -3,7 +3,6 @@ using the SAT approach from https://arxiv.org/abs/2212.05666.
 """
 
 from __future__ import annotations
-from typing import Union
 
 from dataclasses import dataclass
 from itertools import combinations
@@ -18,6 +17,8 @@ from pysat.solvers import Solver
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
+from .initial_mapping import InitialMapping, InitialMappingResult
+
 
 @dataclass
 class SATResult:
@@ -27,9 +28,10 @@ class SATResult:
     solution: dict  # The solution to the SAT problem if it is satisfiable.
     mapping: list  # The mapping of nodes in the pattern graph to nodes in the target graph.
     elapsed_time: float  # The time it took to solve the SAT model.
+    num_swap_layers: int | None = None  # The number of swap layers used for the mapping.
 
 
-class SATMapper:
+class SATMapper(InitialMapping):
     r"""A class to introduce a SAT-approach to solve
     the initial mapping problem in SWAP gate insertion for commuting gates.
 
@@ -54,6 +56,49 @@ class SATMapper:
                 variable defaults to 60 seconds.
         """
         self.timeout = timeout
+
+    def find_initial_mapping(
+        self,
+        program_graph: nx.Graph,
+        swap_strategy: SwapStrategy,
+        min_layers: int | None = 0,
+        max_layers: int | None = None,
+    ) -> InitialMappingResult:
+        r"""Find the best initial mapping for a given swap strategy.
+
+        This method aligns the SAT mapper with the shared
+        :class:`InitialMapping` API by returning an
+        :class:`InitialMappingResult`. Use :meth:`find_initial_mappings` to
+        inspect all SAT solver runs from the binary search.
+        """
+        if max_layers is None:
+            max_layers = program_graph.number_of_nodes() - 1
+
+        results = self.find_initial_mappings(
+            program_graph,
+            swap_strategy,
+            min_layers=min_layers,
+            max_layers=max_layers,
+        )
+        solutions = [k for k, v in results.items() if v.satisfiable]
+
+        if not solutions:
+            raise ValueError("No satisfiable initial mapping found.")
+
+        min_num_layers = min(solutions)
+        result = results[min_num_layers]
+        result.num_swap_layers = min_num_layers
+        return InitialMappingResult(
+            mapping=dict(result.mapping),
+            objective_value=min_num_layers,
+            objective_name="num_swap_layers",
+            elapsed_time=sum(sat_result.elapsed_time for sat_result in results.values()),
+            metadata={
+                "num_swap_layers": min_num_layers,
+                "sat_result": result,
+                "search_results": results,
+            },
+        )
 
     def find_initial_mappings(
         self,
@@ -83,7 +128,7 @@ class SATMapper:
         num_nodes_g1 = len(program_graph.nodes)
         num_nodes_g2 = swap_strategy.distance_matrix.shape[0]
         if num_nodes_g1 > num_nodes_g2:
-            return SATResult(False, [], [], 0)
+            return {}
         if min_layers is None:
             # use the maximum degree of the program graph - 2 as the lower bound.
             min_layers = max((d for _, d in program_graph.degree)) - 2
@@ -157,20 +202,24 @@ class SATMapper:
                 if status:
                     # If the SAT problem is satisfiable, convert the solution to a mapping.
                     mapping = [vid2mapping[idx] for idx in sol if idx > 0]
-                    binary_search_results[num_layers] = SATResult(status, sol, mapping, e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, mapping, e_time, num_layers
+                    )
                     max_layers = num_layers
                 else:
                     # If the SAT problem is unsatisfiable, return the last satisfiable solution.
-                    binary_search_results[num_layers] = SATResult(status, sol, [], e_time)
+                    binary_search_results[num_layers] = SATResult(
+                        status, sol, [], e_time, num_layers
+                    )
                     min_layers = num_layers + 1
 
         return binary_search_results
 
     def remap_graph_with_sat(
         self,
-        graph: Union[nx.Graph | SparsePauliOp],
+        graph: nx.Graph | SparsePauliOp,
         swap_strategy: SwapStrategy,
-    ) -> tuple[int, dict, list] | tuple[None, None, None]:
+    ) -> tuple[nx.Graph | SparsePauliOp, dict, InitialMappingResult] | tuple[None, None, None]:
         """Applies the SAT mapping.
 
         Args:
@@ -179,59 +228,10 @@ class SATMapper:
             swap_strategy: The swap strategy to use to find the initial mapping.
 
         Returns:
-            tuple: A tuple containing the remapped graph, the edge map, and the number of layers of
-            the swap strategy that was used to find the initial mapping. If no solution is found
-            then the tuple contains None for each element.
+            tuple: A tuple containing the remapped graph, the edge map, and a common
+            :class:`InitialMappingResult`. If no solution is found then the tuple contains
+            None for each element.
             Note the returned edge map `{k: v}` means that node `k` in the original
             graph gets mapped to node `v` in the Pauli strings.
         """
-        op_input = isinstance(graph, SparsePauliOp)
-
-        if op_input:
-            graph = self.op2graph(graph)
-
-        num_nodes = len(graph.nodes)
-        results = self.find_initial_mappings(graph, swap_strategy, 0, num_nodes - 1)
-        solutions = [k for k, v in results.items() if v.satisfiable]
-
-        if len(solutions):
-            min_k = min(solutions)
-            edge_map = dict(results[min_k].mapping)
-            remapped_graph = nx.relabel_nodes(graph, edge_map)
-
-            if op_input:
-                return self.graph2op(remapped_graph), edge_map, min_k
-
-            return remapped_graph, edge_map, min_k
-        else:
-            return None, None, None
-
-    @staticmethod
-    def graph2op(graph: nx.Graph) -> SparsePauliOp:
-        """Convert a graph into a sparse Pauli operator."""
-        pauli_list = []
-        for node1, node2, data in graph.edges(data=True):
-            paulis = ["I"] * len(graph)
-            paulis[node1], paulis[node2] = "Z", "Z"
-            weight = data["weight"] if "weight" in data else 1.0
-            pauli_list.append(("".join(paulis)[::-1], weight))
-
-        return SparsePauliOp.from_list(pauli_list)
-
-    @staticmethod
-    def op2graph(operator: SparsePauliOp) -> nx.Graph:
-        """Convert a cost operator to a graph."""
-        graph, edges = nx.Graph(), []
-        for pauli_str, weight in operator.to_list():
-            edge = [idx for idx, char in enumerate(pauli_str[::-1]) if char == "Z"]
-
-            if len(edge) == 1:
-                edges.append((edge[0], edge[0], np.real(weight)))
-            elif len(edge) == 2:
-                edges.append((edge[0], edge[1], np.real(weight)))
-            else:
-                raise ValueError(f"The operator {operator} is not Quadratic.")
-
-        graph.add_weighted_edges_from(edges)
-
-        return graph
+        return self.remap_graph(graph, swap_strategy)

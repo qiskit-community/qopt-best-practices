@@ -10,7 +10,12 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import CouplingMap
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
-from qopt_best_practices.qubit_mapping import SimulatedAnnealingMapper
+from qopt_best_practices.qubit_mapping import (
+    InitialMapping,
+    InitialMappingResult,
+    SAMapper,
+    SimulatedAnnealingMapper,
+)
 
 
 class TestSimulatedAnnealingMapping(TestCase):
@@ -68,6 +73,32 @@ class TestSimulatedAnnealingMapping(TestCase):
         self.assertLessEqual(result.cost, 0)
         self.assertGreaterEqual(result.elapsed_time, 0.0)
 
+    def test_shared_initial_mapping_api(self):
+        """Test SAMapper implements the shared initial mapping API."""
+
+        mapper = SAMapper(
+            initial_temp=0.1,
+            cooling_rate=0.995,
+            stop_temp=1e-6,
+            max_iter=3000,
+            max_restarts=2,
+        )
+
+        self._seed_rng()
+        remapped_graph, edge_map, remap_result = mapper.remap_graph(self.graph, self.swap_strategy)
+
+        self.assertIsInstance(mapper, InitialMapping)
+        self.assertIsInstance(SimulatedAnnealingMapper(), SAMapper)
+        self.assertIsInstance(remap_result, InitialMappingResult)
+        self.assertEqual(remap_result.objective_name, "cost")
+        self.assertEqual(set(edge_map), set(self.graph.nodes))
+        self.assertEqual(set(edge_map.values()), set(range(self.graph.number_of_nodes())))
+        self.assertLessEqual(remap_result.cost, 0)
+        self.assertEqual(
+            self._weighted_edges(remapped_graph),
+            self._weighted_edges(nx.relabel_nodes(self.graph, edge_map)),
+        )
+
     def test_remap_graph_with_sa_matches_find_initial_mapping(self):
         """Test remap_graph_with_sa uses the same mapping returned by find_initial_mapping."""
 
@@ -77,12 +108,12 @@ class TestSimulatedAnnealingMapping(TestCase):
         result = mapper.find_initial_mapping(self.graph, self.swap_strategy)
 
         self._seed_rng()
-        remapped_graph, edge_map, cost = mapper.remap_graph_with_sa(
+        remapped_graph, edge_map, remap_result = mapper.remap_graph_with_sa(
             self.graph, self.swap_strategy
         )
 
         self.assertEqual(edge_map, result.mapping)
-        self.assertEqual(cost, result.cost)
+        self.assertEqual(remap_result.cost, result.cost)
         self.assertEqual(
             self._weighted_edges(remapped_graph),
             self._weighted_edges(nx.relabel_nodes(self.graph, edge_map)),
@@ -95,12 +126,13 @@ class TestSimulatedAnnealingMapping(TestCase):
         operator = mapper.graph2op(self.graph)
 
         self._seed_rng()
-        remapped_op, edge_map, cost = mapper.remap_graph_with_sa(operator, self.swap_strategy)
+        remapped_op, edge_map, result = mapper.remap_graph_with_sa(operator, self.swap_strategy)
 
         self.assertIsInstance(remapped_op, SparsePauliOp)
+        self.assertIsInstance(result, InitialMappingResult)
         self.assertEqual(set(edge_map), set(self.graph.nodes))
         self.assertEqual(set(edge_map.values()), set(range(self.graph.number_of_nodes())))
-        self.assertLessEqual(cost, 0)
+        self.assertLessEqual(result.cost, 0)
         self.assertEqual(
             self._weighted_edges(mapper.op2graph(remapped_op)),
             self._weighted_edges(nx.relabel_nodes(self.graph, edge_map)),
@@ -125,8 +157,8 @@ class TestSimulatedAnnealingMapping(TestCase):
         swap_strategy = SwapStrategy(cmap, [])
         mapper = self._build_mapper()
 
-        remapped_graph, edge_map, cost = mapper.remap_graph_with_sa(graph, swap_strategy)
+        remapped_graph, edge_map, result = mapper.remap_graph_with_sa(graph, swap_strategy)
 
         self.assertIsNone(remapped_graph)
         self.assertIsNone(edge_map)
-        self.assertIsNone(cost)
+        self.assertIsNone(result)

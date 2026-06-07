@@ -117,7 +117,7 @@ class SAMapper(InitialMapping):
         # Generate all 2q-gate layers for the full swap strategy on the
         # hardware line.  The SA searches for the initial mapping that
         # maximises natively-connected edges across all swap layers.
-        list_2q = SWAP_pairs(n_physical)
+        list_2q = swap_pairs(n_physical)
 
         # Pad the program graph with isolated logical nodes so the annealer
         # can assign a subset of the physical qubits when n_physical > n_logical.
@@ -201,7 +201,7 @@ class SimulatedAnnealingMapper(SAMapper):
     """Backward-compatible name for :class:`SAMapper`."""
 
 
-def SWAP_pairs(nq):
+def swap_pairs(nq):
     qubit_order = list(range(nq))
     list_2q = [[(qubit_order[ii], qubit_order[ii + 1]) for ii in range(0, nq - 1, 2)]]
     for i in range(0, nq):

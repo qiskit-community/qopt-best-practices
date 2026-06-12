@@ -10,7 +10,7 @@ target-version = ['py39', 'py310', 'py311']
 py-version = "3.8"  # update it when bumping minimum supported python version
 
 [tool.pylint.basic]
-good-names = ["a", "b", "i", "j", "k", "d", "n", "m", "ex", "v", "w", "x", "y", "z", "Run", "_", "logger", "q", "c", "r", "qr", "cr", "qc", "nd", "pi", "op", "b", "ar", "br", "p", "cp", "ax", "dt", "__unittest", "iSwapGate", "mu"]
+good-names = ["a", "b", "i", "j", "k", "d", "n", "m", "ex", "u", "v", "w", "x", "y", "z", "Run", "_", "logger", "q", "c", "r", "qr", "cr", "qc", "nd", "pi", "op", "b", "ar", "br", "p", "cp", "ax", "dt", "__unittest", "iSwapGate", "mu"]
 method-rgx = "(([a-z_][a-z0-9_]{2,49})|(assert[A-Z][a-zA-Z0-9]{2,43})|(test_[_a-zA-Z0-9]{2,}))$"
 variable-rgx = "[a-z_][a-z0-9_]{1,30}$"
 
@@ -26,7 +26,7 @@ disable = [
     "duplicate-code", # disabled as it is too verbose
     "redundant-returns-doc", # for @abstractmethod, it cannot interpret "pass"
     "too-many-lines", "too-many-branches", "too-many-locals", "too-many-nested-blocks", "too-many-statements",
-    "too-many-instance-attributes", "too-many-arguments", "too-many-public-methods", "too-few-public-methods", "too-many-ancestors",
+    "too-many-instance-attributes", "too-many-arguments", "too-many-positional-arguments", "too-many-public-methods", "too-few-public-methods", "too-many-ancestors",
     "unnecessary-pass", # allow for methods with just "pass", for clarity
     "no-else-return",  # relax "elif" after a clause with a return
     "docstring-first-line-empty", # relax docstring style

@@ -1,5 +1,5 @@
 """A class to solve the SWAP gate insertion initial mapping problem
-using simulated annealing from https://arxiv.org/pdf/2505.17944v1.
+using the simulated annealing approach from https://arxiv.org/pdf/2505.17944v1.
 """
 
 from __future__ import annotations

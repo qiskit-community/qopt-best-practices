@@ -1,10 +1,8 @@
 """Tests for the simulated annealing mapper."""
 
 from unittest import TestCase
-import random
 
 import networkx as nx
-import numpy as np
 
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler import CouplingMap
@@ -29,19 +27,8 @@ class TestSimulatedAnnealingMapping(TestCase):
         self.swap_strategy = SwapStrategy.from_line(list(range(self.graph.number_of_nodes())))
 
     @staticmethod
-    def _seed_rng():
-        random.seed(0)
-        np.random.seed(0)
-
-    @staticmethod
     def _build_mapper():
-        return SimulatedAnnealingMapper(
-            initial_temp=0.1,
-            cooling_rate=0.995,
-            stop_temp=1e-6,
-            max_iter=3000,
-            max_restarts=2,
-        )
+        return SimulatedAnnealingMapper(max_iter=3000, max_restarts=2, seed=0)
 
     @staticmethod
     def _weighted_edges(graph):
@@ -65,26 +52,81 @@ class TestSimulatedAnnealingMapping(TestCase):
 
         mapper = self._build_mapper()
 
-        self._seed_rng()
         result = mapper.find_initial_mapping(self.graph, self.swap_strategy)
 
         self.assertEqual(set(result.mapping), set(self.graph.nodes))
         self.assertEqual(set(result.mapping.values()), set(range(self.graph.number_of_nodes())))
-        self.assertLessEqual(result.cost, 0)
+        self.assertGreaterEqual(result.cost, 0)
+        self.assertEqual(result.num_swap_layers, result.cost)
         self.assertGreaterEqual(result.elapsed_time, 0.0)
+
+    def test_path_graph_needs_no_swap_layers(self):
+        """Test the annealer finds a zero-swap-layer mapping for a path graph."""
+
+        mapper = self._build_mapper()
+
+        result = mapper.find_initial_mapping(self.graph, self.swap_strategy)
+
+        self.assertEqual(result.cost, 0)
+
+    def test_seed_reproducibility(self):
+        """Test that the same seed gives the same mapping."""
+
+        result_a = self._build_mapper().find_initial_mapping(self.graph, self.swap_strategy)
+        result_b = self._build_mapper().find_initial_mapping(self.graph, self.swap_strategy)
+
+        self.assertEqual(result_a.mapping, result_b.mapping)
+        self.assertEqual(result_a.cost, result_b.cost)
+
+    def test_mapping_quality_on_regular_graph(self):
+        """Test the achieved number of swap layers on a 3-regular graph.
+
+        The maximum distance-matrix entry over the mapped program edges must
+        equal the reported cost, and lie well below the worst case.
+        """
+
+        graph = nx.random_regular_graph(3, 14, seed=2)
+        swap_strategy = SwapStrategy.from_line(list(range(14)))
+        mapper = SimulatedAnnealingMapper(seed=1)
+
+        result = mapper.find_initial_mapping(graph, swap_strategy)
+
+        dist = swap_strategy.distance_matrix
+        achieved = max(int(dist[result.mapping[u]][result.mapping[v]]) for u, v in graph.edges())
+        self.assertEqual(achieved, result.cost)
+        self.assertLessEqual(result.cost, 7)
+
+    def test_arbitrary_node_labels(self):
+        """Test that non-integer node labels are supported."""
+
+        graph = nx.Graph()
+        graph.add_edges_from([("a", "b"), ("b", "c"), ("c", "d")])
+        swap_strategy = SwapStrategy.from_line(list(range(4)))
+        mapper = self._build_mapper()
+
+        result = mapper.find_initial_mapping(graph, swap_strategy)
+
+        self.assertEqual(set(result.mapping), {"a", "b", "c", "d"})
+        self.assertEqual(set(result.mapping.values()), set(range(4)))
+
+    def test_more_physical_than_logical_qubits(self):
+        """Test mapping onto a swap strategy with spare physical qubits."""
+
+        swap_strategy = SwapStrategy.from_line(list(range(6)))
+        mapper = self._build_mapper()
+
+        result = mapper.find_initial_mapping(self.graph, self.swap_strategy)
+        result_padded = mapper.find_initial_mapping(self.graph, swap_strategy)
+
+        self.assertEqual(set(result_padded.mapping), set(self.graph.nodes))
+        self.assertEqual(len(set(result_padded.mapping.values())), len(self.graph.nodes))
+        self.assertLessEqual(result_padded.cost, result.cost)
 
     def test_shared_initial_mapping_api(self):
         """Test SAMapper implements the shared initial mapping API."""
 
-        mapper = SAMapper(
-            initial_temp=0.1,
-            cooling_rate=0.995,
-            stop_temp=1e-6,
-            max_iter=3000,
-            max_restarts=2,
-        )
+        mapper = SAMapper(max_iter=3000, max_restarts=2, seed=0)
 
-        self._seed_rng()
         remapped_graph, edge_map, remap_result = mapper.remap_graph(self.graph, self.swap_strategy)
 
         self.assertIsInstance(mapper, InitialMapping)
@@ -93,7 +135,7 @@ class TestSimulatedAnnealingMapping(TestCase):
         self.assertEqual(remap_result.objective_name, "cost")
         self.assertEqual(set(edge_map), set(self.graph.nodes))
         self.assertEqual(set(edge_map.values()), set(range(self.graph.number_of_nodes())))
-        self.assertLessEqual(remap_result.cost, 0)
+        self.assertGreaterEqual(remap_result.cost, 0)
         self.assertEqual(
             self._weighted_edges(remapped_graph),
             self._weighted_edges(nx.relabel_nodes(self.graph, edge_map)),
@@ -104,10 +146,8 @@ class TestSimulatedAnnealingMapping(TestCase):
 
         mapper = self._build_mapper()
 
-        self._seed_rng()
         result = mapper.find_initial_mapping(self.graph, self.swap_strategy)
 
-        self._seed_rng()
         remapped_graph, edge_map, remap_result = mapper.remap_graph_with_sa(
             self.graph, self.swap_strategy
         )
@@ -125,14 +165,13 @@ class TestSimulatedAnnealingMapping(TestCase):
         mapper = self._build_mapper()
         operator = mapper.graph2op(self.graph)
 
-        self._seed_rng()
         remapped_op, edge_map, result = mapper.remap_graph_with_sa(operator, self.swap_strategy)
 
         self.assertIsInstance(remapped_op, SparsePauliOp)
         self.assertIsInstance(result, InitialMappingResult)
         self.assertEqual(set(edge_map), set(self.graph.nodes))
         self.assertEqual(set(edge_map.values()), set(range(self.graph.number_of_nodes())))
-        self.assertLessEqual(result.cost, 0)
+        self.assertGreaterEqual(result.cost, 0)
         self.assertEqual(
             self._weighted_edges(mapper.op2graph(remapped_op)),
             self._weighted_edges(nx.relabel_nodes(self.graph, edge_map)),

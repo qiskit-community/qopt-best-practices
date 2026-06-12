@@ -2,7 +2,7 @@
 
 from .initial_mapping import InitialMapping, InitialMappingResult
 from .sat_mapper import SATMapper, SATResult
-from .simulated_annealing_mapper import SAMapper, SimulatedAnnealingMapper, SAResult, SWAP_pairs
+from .simulated_annealing_mapper import SAMapper, SimulatedAnnealingMapper, SAResult, swap_pairs
 
 __all__ = [
     "InitialMapping",
@@ -12,5 +12,5 @@ __all__ = [
     "SAMapper",
     "SimulatedAnnealingMapper",
     "SAResult",
-    "SWAP_pairs",
+    "swap_pairs",
 ]

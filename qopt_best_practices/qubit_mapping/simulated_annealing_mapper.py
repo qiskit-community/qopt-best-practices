@@ -1,14 +1,14 @@
 """A class to solve the SWAP gate insertion initial mapping problem
-using simulated annealing.
+using simulated annealing from https://arxiv.org/pdf/2505.17944v1.
 """
 
 from __future__ import annotations
 
+import math
+import random
 import time
 from dataclasses import dataclass
 
-import random
-import math
 import networkx as nx
 
 from qiskit.quantum_info import SparsePauliOp
@@ -19,7 +19,12 @@ from .initial_mapping import InitialMapping, InitialMappingResult
 
 @dataclass(init=False)
 class SAResult(InitialMappingResult):
-    """A data class to hold the result of a simulated annealing run."""
+    """A data class to hold the result of a simulated annealing run.
+
+    The objective value (``cost``) is the number of swap layers of the swap
+    strategy that are needed to execute all two-qubit gates of the program
+    graph under the found mapping.
+    """
 
     def __init__(
         self,
@@ -46,10 +51,23 @@ class SAMapper(InitialMapping):
     using simulated annealing.
 
     Given a program graph :math:`P` (nodes = logical qubits, edges = 2q gates)
-    and a swap strategy that defines the hardware connectivity, this class
-    finds a mapping from logical qubits to physical qubits that minimises the
-    number of program edges that are *not* natively adjacent on the hardware
-    (i.e. edges that would otherwise require SWAP gates).
+    and a swap strategy, this class finds a mapping from logical to physical
+    qubits that minimises the number of swap layers needed to execute every
+    program edge.  The distance matrix of the swap strategy gives, for any
+    pair of physical qubits, the number of swap layers after which they
+    become adjacent; the objective is the maximum of this distance over all
+    program edges.
+
+    The search anneals a sequence of feasibility problems: given the best
+    number of layers :math:`M` found so far, it tries to satisfy "every
+    program edge is within :math:`M - 1` layers" by minimising the total
+    excess distance.  Whenever the excess reaches zero the level is lowered
+    again, mirroring the binary search of :class:`SATMapper`.  Half of the
+    proposed moves are targeted repairs that relocate an endpoint of a
+    violating edge next to its partner; the rest are uniform random swaps.
+
+    Edge weights of the program graph are ignored: only which pairs of
+    qubits interact matters for the swap-layer count.
 
     The class implements the shared :class:`InitialMapping` API so it can be
     used interchangeably with :class:`SATMapper`.
@@ -57,29 +75,45 @@ class SAMapper(InitialMapping):
 
     def __init__(
         self,
-        initial_temp: float = 0.01,
-        cooling_rate: float = 0.9999,
+        initial_temp: float | None = None,
+        cooling_rate: float | None = None,
         stop_temp: float = 1e-8,
         max_iter: int = 10000,
         max_restarts: int = 5,
         verbose: bool = False,
+        seed: int | None = None,
+        repair_prob: float = 0.5,
     ):
         """Initialize the SimulatedAnnealingMapper.
 
         Args:
-            initial_temp: Starting temperature for the annealing schedule.
-            cooling_rate: Multiplicative cooling factor applied each iteration.
-            stop_temp: Temperature below which the annealing loop terminates.
-            max_iter: Maximum number of iterations per reheat cycle.
-            max_restarts: Number of times the initial solution is reset to
-                ``initial_temp`` before returning the best solution found.
+            initial_temp: Starting temperature of each annealing stage.  If
+                ``None`` (default) the temperature is set adaptively from the
+                cost deltas of sampled random moves.
+            cooling_rate: Multiplicative cooling factor applied each
+                iteration.  If ``None`` (default) it is derived so that the
+                temperature decays by four orders of magnitude over one
+                stage of ``max_iter`` iterations.
+            stop_temp: Lower bound on the temperature.
+            max_iter: Maximum number of iterations per annealing stage, i.e.
+                per attempted swap-layer level.
+            max_restarts: Multiplier on ``max_iter`` that fixes the total
+                iteration budget (``max_iter * max_restarts``).  When a level
+                cannot be satisfied the search restarts from a fresh greedy
+                placement until the budget is exhausted.
+            verbose: Print progress whenever a better level is reached.
+            seed: Optional seed for the internal random number generator.
+            repair_prob: Probability of proposing a targeted repair move
+                instead of a uniform random swap.
         """
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
         self.stop_temp = stop_temp
-        self.max_iter = max_iter
-        self.max_restarts = max_restarts
+        self.max_iter = int(max_iter)
+        self.max_restarts = int(max_restarts)
         self.verbose = verbose
+        self.seed = seed
+        self.repair_prob = repair_prob
 
     # ------------------------------------------------------------------
     # Public API
@@ -94,54 +128,144 @@ class SAMapper(InitialMapping):
 
         Args:
             program_graph: The program graph where each node is a logical
-                qubit and each edge represents a 2q gate.
-            swap_strategy: Defines the hardware topology via its
-                ``distance_matrix``.  The number of hardware qubits is
-                inferred from the shape of the distance matrix.
+                qubit and each edge represents a 2q gate.  Node labels may
+                be arbitrary hashables.
+            swap_strategy: Defines the hardware topology and swap layers via
+                its ``distance_matrix``.
 
         Returns:
-            SAResult: The best mapping, cost, and elapsed time found by the
-                annealing run.
+            SAResult: The best mapping found, with the number of swap layers
+                it requires as the objective value.
+
+        Raises:
+            ValueError: If the program graph has more nodes than the swap
+                strategy has physical qubits, or if the swap strategy cannot
+                make all program edges adjacent.
         """
         t_start = time.time()
 
-        n_physical = swap_strategy.distance_matrix.shape[0]
-        n_logical = program_graph.number_of_nodes()
+        dist_np = swap_strategy.distance_matrix
+        n_phys = dist_np.shape[0]
+        nodes = list(program_graph.nodes())
+        n_log = len(nodes)
 
-        if n_logical > n_physical:
+        if n_log > n_phys:
             raise ValueError(
-                f"Program graph has {n_logical} nodes but the swap strategy "
-                f"only defines {n_physical} physical qubits."
+                f"Program graph has {n_log} nodes but the swap strategy "
+                f"only defines {n_phys} physical qubits."
             )
 
-        # Generate all 2q-gate layers for the full swap strategy on the
-        # hardware line.  The SA searches for the initial mapping that
-        # maximises natively-connected edges across all swap layers.
-        list_2q = swap_pairs(n_physical)
+        rng = random.Random(self.seed)
 
-        # Pad the program graph with isolated logical nodes so the annealer
-        # can assign a subset of the physical qubits when n_physical > n_logical.
-        padded_program_graph = program_graph.copy()
-        padded_program_graph.add_nodes_from(range(n_physical))
+        # Entries of -1 mean the pair never becomes adjacent; encode them as
+        # an unreachable distance so such placements are never selected.
+        max_finite = int(dist_np[dist_np >= 0].max()) if n_phys > 1 else 0
+        unreachable = max_finite + n_phys + 1
+        dist = [[int(d) if d >= 0 else unreachable for d in row] for row in dist_np]
 
-        # Internal mapping is {physical_qubit: logical_qubit}. Start from the
-        # identity placement over the padded logical register.
-        initial_mapping = {i: i for i in range(n_physical)}
+        # Work on integer logical indices 0..n_log-1; padded indices up to
+        # n_phys-1 are isolated placeholders for unused physical qubits.
+        idx = {u: i for i, u in enumerate(nodes)}
+        edges = [(idx[u], idx[v]) for u, v in program_graph.edges() if u != v]
+        nbrs: list[list[int]] = [[] for _ in range(n_phys)]
+        inc_edges: list[list[int]] = [[] for _ in range(n_phys)]
+        for e_idx, (u, v) in enumerate(edges):
+            nbrs[u].append(v)
+            nbrs[v].append(u)
+            inc_edges[u].append(e_idx)
+            inc_edges[v].append(e_idx)
 
-        result = simulated_annealing_func(
-            G_original=padded_program_graph,
-            initial_mapping=initial_mapping,
-            list_2q=list_2q,
-            initial_temp=self.initial_temp,
-            cooling_rate=self.cooling_rate,
-            stop_temp=self.stop_temp,
-            max_iter=self.max_iter,
-            verbose=self.verbose,
-            max_restarts=self.max_restarts,
+        trace: dict = {"num_swap_layers": [], "iterations": []}
+
+        if not edges:
+            mapping = {u: idx[u] for u in nodes}
+            return SAResult(
+                mapping=mapping,
+                cost=0,
+                elapsed_time=time.time() - t_start,
+                metadata={"num_swap_layers": 0, "trace": trace},
+            )
+
+        # For repair moves: physical qubits sorted by distance from q, and
+        # how many of them are within each number of layers.
+        sorted_by_dist = []
+        prefix_count = []
+        for q in range(n_phys):
+            others = sorted((p for p in range(n_phys) if p != q), key=dist[q].__getitem__)
+            counts = [0] * (max_finite + 2)
+            for p in others:
+                d = dist[q][p]
+                if d <= max_finite:
+                    counts[d] += 1
+            for d in range(1, max_finite + 2):
+                counts[d] += counts[d - 1]
+            sorted_by_dist.append(others)
+            prefix_count.append(counts)
+
+        pos = self._greedy_init(nbrs, dist, n_phys, n_log, rng)
+        at = [0] * n_phys
+        for log, phys in enumerate(pos):
+            at[phys] = log
+
+        def cur_max():
+            return max(dist[pos[u]][pos[v]] for u, v in edges)
+
+        best_layers = cur_max()
+        best_pos = pos[:]
+        used = 0
+        total_budget = self.max_iter * self.max_restarts
+        lower_bound = max(0, max(len(n) for n in nbrs) - 2)
+
+        trace["num_swap_layers"].append(best_layers)
+        trace["iterations"].append(used)
+
+        while best_layers > lower_bound and used < total_budget:
+            level = best_layers - 1
+            stage_budget = min(self.max_iter, total_budget - used)
+            solved, used = self._anneal_level(
+                level,
+                pos,
+                at,
+                edges,
+                nbrs,
+                inc_edges,
+                dist,
+                sorted_by_dist,
+                prefix_count,
+                n_phys,
+                stage_budget,
+                used,
+                rng,
+            )
+            if solved:
+                best_layers = cur_max()
+                best_pos = pos[:]
+                trace["num_swap_layers"].append(best_layers)
+                trace["iterations"].append(used)
+                if self.verbose:
+                    print(f"num swap layers: {best_layers} | iteration: {used}")
+            else:
+                # Could not satisfy this level: restart from a fresh greedy
+                # placement (or a random one for diversity) and try again.
+                pos[:] = self._greedy_init(nbrs, dist, n_phys, n_log, rng)
+                if rng.random() < 0.5:
+                    rng.shuffle(pos)
+                for log, phys in enumerate(pos):
+                    at[phys] = log
+                if cur_max() < best_layers:
+                    best_layers = cur_max()
+                    best_pos = pos[:]
+
+        if best_layers >= unreachable:
+            raise ValueError("The swap strategy cannot make all program edges adjacent.")
+
+        mapping = {u: best_pos[idx[u]] for u in nodes}
+        return SAResult(
+            mapping=mapping,
+            cost=best_layers,
+            elapsed_time=time.time() - t_start,
+            metadata={"num_swap_layers": best_layers, "trace": trace},
         )
-
-        result.elapsed_time = time.time() - t_start
-        return result
 
     def remap_graph_with_sa(
         self,
@@ -162,8 +286,8 @@ class SAMapper(InitialMapping):
             * ``remapped_graph`` – graph with nodes relabelled to physical
               qubit indices,
             * ``edge_map`` – ``{logical_qubit: physical_qubit}`` mapping,
-            * ``result`` – common :class:`InitialMappingResult` with the best
-              cost returned by the annealer as its objective value.
+            * ``result`` – common :class:`InitialMappingResult` with the
+              number of swap layers as its objective value.
 
             If the mapping fails (e.g. too few physical qubits), returns
             ``(None, None, None)``.
@@ -179,22 +303,163 @@ class SAMapper(InitialMapping):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _hardware_graph_from_strategy(swap_strategy: SwapStrategy) -> nx.Graph:
-        """Build the base hardware coupling graph (layer-0 connectivity) from
-        a :class:`SwapStrategy`.
+    def _greedy_init(nbrs, dist, n_phys, n_log, rng):
+        """Construct an initial placement.
 
-        Edges are added between any two qubits whose entry in the strategy's
-        ``distance_matrix`` equals 1 (directly connected, no swaps needed).
+        Nodes are placed in order of decreasing degree, each on the free
+        physical qubit that minimises the (max, sum) distance to its already
+        placed neighbours.  Ties are broken randomly so repeated calls give
+        different placements.
         """
-        d_matrix = swap_strategy.distance_matrix
-        n = d_matrix.shape[0]
-        hardware_graph = nx.Graph()
-        hardware_graph.add_nodes_from(range(n))
-        for i in range(n):
-            for j in range(i + 1, n):
-                if d_matrix[i][j] == 1:
-                    hardware_graph.add_edge(i, j)
-        return hardware_graph
+        order = sorted(range(n_log), key=lambda u: -len(nbrs[u]))
+        pos = [-1] * n_phys
+        free = set(range(n_phys))
+        for u in order:
+            placed = [w for w in nbrs[u] if pos[w] >= 0]
+            if placed:
+                q = min(
+                    free,
+                    key=lambda q, placed=tuple(placed): (
+                        max(dist[q][pos[w]] for w in placed),
+                        sum(dist[q][pos[w]] for w in placed),
+                        rng.random(),
+                    ),
+                )
+            else:
+                q = rng.choice(sorted(free))
+            pos[u] = q
+            free.remove(q)
+        free = sorted(free)
+        rng.shuffle(free)
+        for u in range(n_log, n_phys):
+            pos[u] = free.pop()
+        return pos
+
+    def _anneal_level(
+        self,
+        level,
+        pos,
+        at,
+        edges,
+        nbrs,
+        inc_edges,
+        dist,
+        sorted_by_dist,
+        prefix_count,
+        n_phys,
+        stage_budget,
+        used,
+        rng,
+    ):
+        """Anneal the feasibility problem "every edge within ``level`` layers".
+
+        The stage cost is the total excess distance over ``level`` summed
+        over all program edges; it reaches zero exactly when the level is
+        satisfied.  ``pos`` and ``at`` are updated in place.  Returns
+        ``(solved, used)`` with the updated iteration count.
+        """
+        # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+        cost = sum(max(0, dist[pos[u]][pos[v]] - level) for u, v in edges)
+
+        # Violating edges with O(1) sampling and removal.
+        viol_list = [e for e, (u, v) in enumerate(edges) if dist[pos[u]][pos[v]] > level]
+        viol_pos = {e: i for i, e in enumerate(viol_list)}
+
+        def propose():
+            """Pick the pair of logical indices to swap, or None to skip."""
+            if viol_list and rng.random() < self.repair_prob:
+                u, v = edges[viol_list[int(rng.random() * len(viol_list))]]
+                if rng.random() < 0.5:
+                    u, v = v, u
+                # Relocate u onto a physical qubit within `level` layers of v.
+                n_cands = prefix_count[pos[v]][min(level, len(prefix_count[pos[v]]) - 1)]
+                if n_cands == 0:
+                    return None
+                target = sorted_by_dist[pos[v]][int(rng.random() * n_cands)]
+                if target == pos[u]:
+                    return None
+                return u, at[target]
+            i = rng.randrange(n_phys)
+            j = rng.randrange(n_phys - 1)
+            if j >= i:
+                j += 1
+            return i, j
+
+        def swap_delta(i, j):
+            pi, pj = pos[i], pos[j]
+            delta = 0
+            for w in nbrs[i]:
+                if w != j:
+                    pw = pos[w]
+                    delta += max(0, dist[pj][pw] - level) - max(0, dist[pi][pw] - level)
+            for w in nbrs[j]:
+                if w != i:
+                    pw = pos[w]
+                    delta += max(0, dist[pi][pw] - level) - max(0, dist[pj][pw] - level)
+            return delta
+
+        # Temperature schedule for this stage.
+        if self.initial_temp is not None:
+            temp = self.initial_temp
+        else:
+            ups = []
+            for _ in range(50):
+                move = propose()
+                if move is not None:
+                    d = swap_delta(*move)
+                    if d > 0:
+                        ups.append(d)
+            ups.sort()
+            temp = ups[len(ups) // 2] / math.log(2) if ups else 1.0
+        if self.cooling_rate is not None:
+            alpha = self.cooling_rate
+        else:
+            t_end = max(self.stop_temp, temp * 1e-4)
+            alpha = (t_end / temp) ** (1.0 / stage_budget)
+
+        _random = rng.random
+        _exp = math.exp
+        stop_temp = self.stop_temp
+
+        for _ in range(stage_budget):
+            used += 1
+            if cost == 0:
+                return True, used
+            move = propose()
+            if move is None:
+                continue
+            i, j = move
+            delta = swap_delta(i, j)
+
+            if delta <= 0 or _random() < _exp(-delta / temp):
+                pi, pj = pos[i], pos[j]
+                pos[i], pos[j] = pj, pi
+                at[pj], at[pi] = i, j
+                cost += delta
+                # Refresh the violation status of every affected edge.
+                for e_idx in inc_edges[i]:
+                    self._update_violation(e_idx, edges, pos, dist, level, viol_list, viol_pos)
+                for e_idx in inc_edges[j]:
+                    if e_idx not in inc_edges[i]:
+                        self._update_violation(e_idx, edges, pos, dist, level, viol_list, viol_pos)
+            temp = max(temp * alpha, stop_temp)
+
+        return cost == 0, used
+
+    @staticmethod
+    def _update_violation(e_idx, edges, pos, dist, level, viol_list, viol_pos):
+        """Add or remove edge ``e_idx`` from the violation structure."""
+        u, v = edges[e_idx]
+        violating = dist[pos[u]][pos[v]] > level
+        if violating and e_idx not in viol_pos:
+            viol_pos[e_idx] = len(viol_list)
+            viol_list.append(e_idx)
+        elif not violating and e_idx in viol_pos:
+            i = viol_pos.pop(e_idx)
+            last = viol_list.pop()
+            if last != e_idx:
+                viol_list[i] = last
+                viol_pos[last] = i
 
 
 class SimulatedAnnealingMapper(SAMapper):
@@ -202,6 +467,11 @@ class SimulatedAnnealingMapper(SAMapper):
 
 
 def swap_pairs(nq):
+    """Generate the 2q-gate layers of a full line swap strategy on ``nq`` qubits.
+
+    Kept for backward compatibility; :class:`SAMapper` now reads the swap
+    layers directly from the distance matrix of the swap strategy.
+    """
     qubit_order = list(range(nq))
     list_2q = [[(qubit_order[ii], qubit_order[ii + 1]) for ii in range(0, nq - 1, 2)]]
     for i in range(0, nq):
@@ -211,181 +481,3 @@ def swap_pairs(nq):
             [tuple([qubit_order[ii], qubit_order[ii + 1]]) for ii in range(i % 2, nq - 1, 2)]
         )
     return list_2q
-
-
-def simulated_annealing_func(
-    G_original: nx.Graph,
-    initial_mapping: dict,
-    list_2q: list,
-    initial_temp=0.01,
-    cooling_rate=0.9999,
-    stop_temp=1e-8,
-    max_iter=10000,
-    verbose=False,
-    max_restarts=5,
-) -> SAResult:
-    n = G_original.number_of_nodes()
-    max_iter = int(max_iter)
-
-    # Use list for O(1) index access (faster than dict)
-    mapping = [initial_mapping[k] for k in range(n)]
-
-    # Adjacency matrix for O(1) edge lookup (avoids tuple creation + hashing)
-    adj = [[False] * n for _ in range(n)]
-    for u, v in G_original.edges():
-        adj[u][v] = True
-        adj[v][u] = True
-
-    num_layers = len(list_2q)
-
-    # Precompute: for each node, list of (layer_index, partner_node) for all 2q edges
-    node_edges = [[] for _ in range(n)]
-    for l_idx in range(num_layers):
-        for edge in list_2q[l_idx]:
-            if len(edge) == 2:
-                u, v = edge
-                node_edges[u].append((l_idx, v))
-                node_edges[v].append((l_idx, u))
-
-    # Per-layer valid and invalid 2q-edge counts
-    valid_count = [0] * num_layers
-    invalid_count = [0] * num_layers
-
-    def recompute_layer_counts():
-        for l_idx in range(num_layers):
-            vc = 0
-            ic = 0
-            for edge in list_2q[l_idx]:
-                if len(edge) == 2:
-                    u, v = edge
-                    if adj[mapping[u]][mapping[v]]:
-                        vc += 1
-                    else:
-                        ic += 1
-            valid_count[l_idx] = vc
-            invalid_count[l_idx] = ic
-
-    recompute_layer_counts()
-
-    def compute_cost_depth():
-        cnots = 0
-        depth = 0
-        for l in range(num_layers - 1, -1, -1):
-            cnots -= invalid_count[l]
-            if valid_count[l] > 0:
-                return cnots, depth
-            depth -= 1
-        return cnots, depth
-
-    current_cost, current_depth = compute_cost_depth()
-    best_mapping = mapping[:]
-    best_cost = current_cost
-    best_depth = current_depth
-
-    T = initial_temp
-    iteration = 0
-    trace: dict = {"cost": [], "depth": [], "iterations": [], "T": []}
-
-    # Local references for hot-path speedup
-    _randint = random.randint
-    _random = random.random
-    _exp = math.exp
-    n_minus_1 = n - 1
-    n_minus_2 = n - 2
-    best_overall_cost = best_cost
-    best_overall_mapping = best_mapping[:]
-
-    for _ in range(max_restarts):
-        T = initial_temp
-        iteration = 0
-        current_iter = trace["iterations"][-1] if trace["iterations"] else 0
-        mapping = [initial_mapping[k] for k in range(n)]
-        recompute_layer_counts()
-        current_cost, current_depth = compute_cost_depth()
-        best_mapping = mapping[:]
-        best_cost = current_cost
-        best_depth = current_depth
-
-        while T > stop_temp and iteration < max_iter:
-            # Fast random pair selection (avoids range() + sample())
-            i = _randint(0, n_minus_1)
-            j = _randint(0, n_minus_2)
-            if j >= i:
-                j += 1
-
-            phys_i = mapping[i]
-            phys_j = mapping[j]
-
-            # Incremental cost: only check edges involving swapped nodes i or j
-            changes = []
-
-            for l_idx, partner in node_edges[i]:
-                if partner == j:
-                    continue  # edge (i,j): swapping both endpoints doesn't change validity
-                mp = mapping[partner]
-                old_v = adj[phys_i][mp]
-                new_v = adj[phys_j][mp]
-                if old_v != new_v:
-                    changes.append((l_idx, 1 if new_v else -1))
-
-            for l_idx, partner in node_edges[j]:
-                if partner == i:
-                    continue
-                mp = mapping[partner]
-                old_v = adj[phys_j][mp]
-                new_v = adj[phys_i][mp]
-                if old_v != new_v:
-                    changes.append((l_idx, 1 if new_v else -1))
-
-            # Apply incremental changes
-            for l_idx, delta in changes:
-                valid_count[l_idx] += delta
-                invalid_count[l_idx] -= delta
-
-            neighbor_cost, neighbor_depth = compute_cost_depth()
-            delta_cost = neighbor_cost - current_cost
-
-            # Accept or reject the new solution
-            if delta_cost < 0 or _random() < _exp(-delta_cost / T):
-                mapping[i] = phys_j
-                mapping[j] = phys_i
-                current_cost = neighbor_cost
-                current_depth = neighbor_depth
-
-                if current_cost < best_cost:
-                    best_mapping = mapping[:]
-                    best_cost = current_cost
-                    best_depth = current_depth
-
-                    if verbose:
-                        print(
-                            f"best depth:{best_depth} | best cost:{best_cost} | iteration:{iteration} | T:{T:.4f}"
-                        )
-
-                    trace["cost"].append(best_cost)
-                    trace["depth"].append(best_depth)
-                    trace["iterations"].append(current_iter + iteration)
-                    trace["T"].append(T)
-
-            else:
-                # Reject: revert incremental changes
-                for l_idx, delta in changes:
-                    valid_count[l_idx] -= delta
-                    invalid_count[l_idx] += delta
-
-            T *= cooling_rate
-            iteration += 1
-
-        if best_cost < best_overall_cost:
-            best_overall_cost = best_cost
-            best_overall_mapping = best_mapping[:]
-
-    best_mapping = dict(enumerate(best_overall_mapping))
-
-    best_mapping = {v: k for k, v in best_mapping.items()}
-    return SAResult(
-        mapping=best_mapping,
-        cost=best_overall_cost,
-        elapsed_time=0.0,
-        metadata={"trace": trace},
-    )

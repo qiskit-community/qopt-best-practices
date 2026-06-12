@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass
 
 import networkx as nx
+import numpy as np
 
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
@@ -161,7 +162,8 @@ class SAMapper(InitialMapping):
         # an unreachable distance so such placements are never selected.
         max_finite = int(dist_np[dist_np >= 0].max()) if n_phys > 1 else 0
         unreachable = max_finite + n_phys + 1
-        dist = [[int(d) if d >= 0 else unreachable for d in row] for row in dist_np]
+        dist_arr = np.where(dist_np >= 0, dist_np, unreachable).astype(np.int64)
+        dist = dist_arr.tolist()
 
         # Work on integer logical indices 0..n_log-1; padded indices up to
         # n_phys-1 are isolated placeholders for unused physical qubits.
@@ -187,20 +189,17 @@ class SAMapper(InitialMapping):
             )
 
         # For repair moves: physical qubits sorted by distance from q, and
-        # how many of them are within each number of layers.
-        sorted_by_dist = []
-        prefix_count = []
-        for q in range(n_phys):
-            others = sorted((p for p in range(n_phys) if p != q), key=dist[q].__getitem__)
-            counts = [0] * (max_finite + 2)
-            for p in others:
-                d = dist[q][p]
-                if d <= max_finite:
-                    counts[d] += 1
-            for d in range(1, max_finite + 2):
-                counts[d] += counts[d - 1]
-            sorted_by_dist.append(others)
-            prefix_count.append(counts)
+        # how many of them are within each number of layers (vectorised).
+        keyed = dist_arr.copy()
+        np.fill_diagonal(keyed, unreachable + 1)
+        order_np = np.argsort(keyed, axis=1, kind="stable")[:, : n_phys - 1]
+        values_np = np.take_along_axis(keyed, order_np, axis=1)
+        sorted_by_dist = order_np.tolist()
+        prefix_count = [
+            np.searchsorted(values_np[q], np.arange(max_finite + 1), side="right").tolist()
+            for q in range(n_phys)
+        ]
+        del keyed, order_np, values_np
 
         pos = self._greedy_init(nbrs, dist, n_phys, n_log, rng)
         at = [0] * n_phys
@@ -219,8 +218,13 @@ class SAMapper(InitialMapping):
         trace["num_swap_layers"].append(best_layers)
         trace["iterations"].append(used)
 
+        # The target level descends geometrically and the step is bisected
+        # when a stage fails, mirroring a binary search over the number of
+        # swap layers; one-level steps that still fail trigger a restart.
+        gap = max(1, best_layers // 16)
+
         while best_layers > lower_bound and used < total_budget:
-            level = best_layers - 1
+            level = max(best_layers - gap, 0)
             stage_budget = min(self.max_iter, total_budget - used)
             solved, used = self._anneal_level(
                 level,
@@ -240,21 +244,29 @@ class SAMapper(InitialMapping):
             if solved:
                 best_layers = cur_max()
                 best_pos = pos[:]
+                gap = max(1, best_layers // 16)
                 trace["num_swap_layers"].append(best_layers)
                 trace["iterations"].append(used)
                 if self.verbose:
                     print(f"num swap layers: {best_layers} | iteration: {used}")
             else:
-                # Could not satisfy this level: restart from a fresh greedy
-                # placement (or a random one for diversity) and try again.
-                pos[:] = self._greedy_init(nbrs, dist, n_phys, n_log, rng)
-                if rng.random() < 0.5:
-                    rng.shuffle(pos)
+                pos[:] = best_pos
                 for log, phys in enumerate(pos):
                     at[phys] = log
-                if cur_max() < best_layers:
-                    best_layers = cur_max()
-                    best_pos = pos[:]
+                if gap > 1:
+                    gap = max(1, gap // 2)
+                else:
+                    # Even a single-level step failed: restart from a fresh
+                    # greedy placement (or a random one for diversity).
+                    pos[:] = self._greedy_init(nbrs, dist, n_phys, n_log, rng)
+                    if rng.random() < 0.5:
+                        rng.shuffle(pos)
+                    for log, phys in enumerate(pos):
+                        at[phys] = log
+                    if cur_max() < best_layers:
+                        best_layers = cur_max()
+                        best_pos = pos[:]
+                    gap = max(1, best_layers // 16)
 
         if best_layers >= unreachable:
             raise ValueError("The swap strategy cannot make all program edges adjacent.")

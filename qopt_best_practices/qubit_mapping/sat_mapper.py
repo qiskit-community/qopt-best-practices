@@ -10,10 +10,8 @@ from threading import Timer
 
 import networkx as nx
 import numpy as np
-
 from pysat.formula import CNF, IDPool
 from pysat.solvers import Solver
-
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 

@@ -181,9 +181,9 @@ class SATMapper:
 
     def remap_graph_with_sat(
         self,
-        graph: Union[nx.Graph | SparsePauliOp],
+        graph: nx.Graph | SparsePauliOp,
         swap_strategy: SwapStrategy,
-    ) -> tuple[int, dict, list] | tuple[None, None, None]:
+    ) -> tuple[nx.Graph | SparsePauliOp, dict, int] | tuple[None, None, None]:
         """Applies the SAT mapping.
 
         Args:
@@ -208,9 +208,9 @@ class SATMapper:
         solutions = [k for k, v in results.items() if v.satisfiable]
 
         if len(solutions):
-            min_k = min(solutions)
+            min_k: int = min(solutions)
             edge_map = dict(results[min_k].mapping)
-            remapped_graph = nx.relabel_nodes(graph, edge_map)
+            remapped_graph: nx.Graph = nx.relabel_nodes(graph, edge_map)
 
             if op_input:
                 return self.graph2op(remapped_graph), edge_map, min_k

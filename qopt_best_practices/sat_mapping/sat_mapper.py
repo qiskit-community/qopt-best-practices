@@ -7,7 +7,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 from threading import Timer
-from typing import Union
 
 import networkx as nx
 import numpy as np

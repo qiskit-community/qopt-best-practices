@@ -8,8 +8,8 @@ import networkx as nx
 from qiskit.transpiler import CouplingMap
 from qiskit.transpiler.passes.routing.commuting_2q_gate_routing import SwapStrategy
 
-from qopt_best_practices.sat_mapping import SATMapper
 from qopt_best_practices.utils import build_max_cut_graph, build_max_cut_paulis
+from qopt_best_practices.qubit_mapping import InitialMapping, InitialMappingResult, SATMapper
 
 
 class TestSwapStrategies(TestCase):
@@ -61,6 +61,32 @@ class TestSwapStrategies(TestCase):
 
         self.assertTrue(nx.is_isomorphic(remapped_g, self.mapped_graph))
 
+    def test_shared_initial_mapping_api(self):
+        """Test SATMapper implements the shared initial mapping API."""
+
+        mapper = SATMapper()
+        graph = nx.path_graph(3)
+        swap_strategy = SwapStrategy.from_line(list(range(3)))
+
+        result = mapper.find_initial_mapping(graph, swap_strategy)
+        remapped_g, edge_map, remap_result = mapper.remap_graph(graph, swap_strategy)
+
+        self.assertIsInstance(mapper, InitialMapping)
+        self.assertIsInstance(result, InitialMappingResult)
+        self.assertIsInstance(remap_result, InitialMappingResult)
+        self.assertEqual(result.objective_name, "num_swap_layers")
+        self.assertEqual(result.num_swap_layers, remap_result.num_swap_layers)
+        self.assertEqual(result.mapping, edge_map)
+        self.assertEqual(set(edge_map), set(graph.nodes))
+        self.assertEqual(
+            set(edge_map.values()),
+            set(range(graph.number_of_nodes())),
+        )
+        self.assertEqual(
+            sorted(remapped_g.edges()),
+            sorted(nx.relabel_nodes(graph, edge_map).edges()),
+        )
+
     def test_remap_graph_with_sat_parametric_weights(self):
         """Test remap_graph_with_sat preserves parametric weights"""
 
@@ -103,25 +129,25 @@ class TestSwapStrategies(TestCase):
 
         mapper = SATMapper()
 
-        _, permutation, min_layer = mapper.remap_graph_with_sat(graph, swap_strategy)
+        _, permutation, result = mapper.remap_graph_with_sat(graph, swap_strategy)
 
         # Spot check a few permutations.
         self.assertEqual(permutation[0], 9)
         self.assertEqual(permutation[8], 1)
 
         # Crucially, if the `connectivity_matrix` in `find_initial_mappings` we get a wrong result.
-        self.assertEqual(min_layer, 3)
+        self.assertEqual(result.num_swap_layers, 3)
 
     def test_full_connectivity(self):
         """Test that the SAT mapper works when the SWAP strategy has full connectivity."""
         graph = nx.random_regular_graph(3, 6, seed=1)
         swap_strategy = SwapStrategy.from_line(list(range(6)))
         sat_mapper = SATMapper()
-        _, _, min_sat_layers = sat_mapper.remap_graph_with_sat(
+        _, _, result = sat_mapper.remap_graph_with_sat(
             graph=graph,
             swap_strategy=swap_strategy,
         )
-        self.assertEqual(min_sat_layers, 4)
+        self.assertEqual(result.num_swap_layers, 4)
 
     def test_unable_to_remap(self):
         """Test that the SAT mapper works when the SWAP strategy is unable to remap."""
